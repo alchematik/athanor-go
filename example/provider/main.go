@@ -5,19 +5,7 @@ import (
 
 	provider "github.com/alchematik/athanor-go/example/schema/output"
 	plugin "github.com/alchematik/athanor-go/sdk/provider/plugin"
-	sdk "github.com/alchematik/athanor-go/sdk/provider/value"
 )
-
-type Server struct {
-	ResourceHandlers map[string]ResourceHandler
-}
-
-type ResourceHandler interface {
-	GetResource(context.Context, sdk.Identifier) (sdk.ResourceValue, error)
-	CreateResource(context.Context, sdk.Identifier, sdk.Value) (sdk.ResourceValue, error)
-	UpdateResource(context.Context, sdk.Identifier, sdk.Value) (sdk.ResourceValue, error)
-	DeleteResource(context.Context, sdk.Identifier) error
-}
 
 type Bucket struct {
 }
