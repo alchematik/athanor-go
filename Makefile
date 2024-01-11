@@ -9,3 +9,4 @@ go/build:
 
 provider/generate: go/build install/athanor
 	athanor provider generate ./example/schema/config.json
+

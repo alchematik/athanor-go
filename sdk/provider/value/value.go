@@ -39,9 +39,20 @@ func ParseProto(val *providerpb.Value) (Value, error) {
 	switch v := val.GetType().(type) {
 	case *providerpb.Value_StringValue:
 		return String(v.StringValue), nil
+	case *providerpb.Value_Map:
+		m := Map{}
+		for k, v := range v.Map.GetEntries() {
+			var err error
+			m[k], err = ParseProto(v)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return m, nil
+	case *providerpb.Value_Identifier:
+		return ParseIdentifierProto(v.Identifier)
 	default:
 		return nil, fmt.Errorf("unhandled proto type: %T", v)
-
 	}
 }
 
@@ -52,6 +63,8 @@ func ToValue(val any) (Value, error) {
 	case bool:
 		return Bool(v), nil
 	case ResourceIdentifier:
+		return v.ToValue()
+	case ResourceField:
 		return v.ToValue()
 	default:
 		return nil, fmt.Errorf("cannot convert type %T to Value", val)

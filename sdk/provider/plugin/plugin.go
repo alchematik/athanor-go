@@ -6,42 +6,42 @@ import (
 	providerpb "github.com/alchematik/athanor-go/internal/gen/go/proto/provider/v1"
 	"github.com/alchematik/athanor-go/sdk/provider/value"
 
-	"github.com/hashicorp/go-plugin"
+	hcplugin "github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func Serve(handlers map[string]ResourceHandler) {
-	plugin.Serve(&plugin.ServeConfig{
-		HandshakeConfig: plugin.HandshakeConfig{
+	hcplugin.Serve(&hcplugin.ServeConfig{
+		HandshakeConfig: hcplugin.HandshakeConfig{
 			ProtocolVersion:  1,
 			MagicCookieKey:   "COOKIE",
 			MagicCookieValue: "hi",
 		},
-		Plugins: map[string]plugin.Plugin{
-			"provider": plug{
+		Plugins: map[string]hcplugin.Plugin{
+			"provider": &plug{
 				server: &server{
 					resourceHandlers: handlers,
 				},
 			},
 		},
-		GRPCServer: plugin.DefaultGRPCServer,
+		GRPCServer: hcplugin.DefaultGRPCServer,
 	})
 }
 
 type plug struct {
-	plugin.Plugin
+	hcplugin.Plugin
 
 	server providerpb.ProviderServer
 }
 
-func (p *plug) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
+func (p *plug) GRPCServer(_ *hcplugin.GRPCBroker, s *grpc.Server) error {
 	providerpb.RegisterProviderServer(s, p.server)
 	return nil
 }
 
-func (p *plug) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, conn *grpc.ClientConn) (any, error) {
+func (p *plug) GRPCClient(_ context.Context, _ *hcplugin.GRPCBroker, conn *grpc.ClientConn) (any, error) {
 	return providerpb.NewProviderClient(conn), nil
 }
 
