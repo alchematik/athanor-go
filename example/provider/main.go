@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
 
+	provider "github.com/alchematik/athanor-go/example/schema/output"
 	providerpb "github.com/alchematik/athanor-go/internal/gen/go/proto/provider/v1"
 	sdk "github.com/alchematik/athanor-go/sdk/provider/value"
 
@@ -17,371 +17,102 @@ type Server struct {
 	ResourceHandlers map[string]ResourceHandler
 }
 
-func ParseBucketIdentifier(val sdk.Value) (BucketIdentifier, error) {
-	m, err := sdk.ParseMap(val)
-	if err != nil {
-		return BucketIdentifier{}, fmt.Errorf("expected MapType, got %T", val)
-	}
-
-	account, err := sdk.ParseStringValue(m["account"])
-	if err != nil {
-		return BucketIdentifier{}, fmt.Errorf("expected StringType, got %T", m["account"])
-	}
-
-	region, err := sdk.ParseStringValue(m["region"])
-	if err != nil {
-		return BucketIdentifier{}, fmt.Errorf("expected StringType, got %T", m["account"])
-	}
-
-	name, err := sdk.ParseStringValue(m["name"])
-	if err != nil {
-		return BucketIdentifier{}, fmt.Errorf("expected StringType, got %T", m["account"])
-	}
-
-	return BucketIdentifier{
-		Account: account,
-		Region:  region,
-		Name:    name,
-	}, nil
-}
-
-type BucketIdentifier struct {
-	Account string
-	Region  string
-	Name    string
-}
-
-func (id BucketIdentifier) ResourceType() string {
-	return "bucket"
-}
-
-func (id BucketIdentifier) ToValue() sdk.Value {
-	return sdk.Identifier{
-		ResourceType: "bucket",
-		Value: sdk.Map{
-			"account": sdk.ToStringValue(id.Account),
-			"region":  sdk.ToStringValue(id.Region),
-			"name":    sdk.ToStringValue(id.Name),
-		},
-	}
-}
-
-func ParseBucketConfig(val sdk.Value) BucketConfig {
-	expiration := val.(sdk.Map)["expiration"].(sdk.String)
-	return BucketConfig{
-		Expiration: expiration,
-	}
-}
-
-type BucketConfig struct {
-	Expiration sdk.String
-}
-
-func (c BucketConfig) ToStateValue() sdk.Value {
-	return sdk.MapValue{
-		"expiration": c.Expiration,
-	}
-}
-
-type BucketAttrs struct {
-	Bar Bar
-}
-
-func (c BucketAttrs) ToStateValue() sdk.Value {
-	return sdk.Map(map[string]sdk.Value{
-		"bar": c.Bar.ToStateValue(),
-	})
-}
-
-type Bar struct {
-	Foo sdk.StringValue
-}
-
-func (b Bar) ToStateValue() sdk.Value {
-	return sdk.Map(map[string]sdk.Value{
-		"foo": b.Foo,
-	})
-}
-
-type BucketObjectIdentifier struct {
-	Bucket sdk.ResourceIdentifier
-	Name   string
-}
-
-func (id BucketObjectIdentifier) ResourceType() string {
-	return "bucket_object"
-}
-
-func (id BucketObjectIdentifier) ToStateValue() sdk.Value {
-	return sdk.Identifier{
-		ResourceType: id.ResourceType(),
-		Value: sdk.Map{
-			"bucket": id.Bucket.ToValue(),
-			"name":   sdk.String(id.Name),
-		},
-	}
-}
-
-func ParseBucketObjectConfig(val sdk.Value) BucketObjectConfig {
-	return BucketObjectConfig{
-		Contents:  val.(sdk.MapValue)["contents"].(sdk.StringValue),
-		SomeField: val.(sdk.MapValue)["some_field"].(sdk.StringValue),
-	}
-}
-
-type BucketObjectConfig struct {
-	Contents  sdk.StringValue
-	SomeField sdk.StringValue
-}
-
-func (b BucketObjectConfig) ToStateValue() sdk.Value {
-	return sdk.Map(map[string]sdk.Value{
-		"contents":   b.Contents,
-		"some_field": b.SomeField,
-	})
-}
-
-type BucketObjectAttrs struct {
-}
-
-func (b BucketObjectAttrs) ToStateValue() sdk.Value {
-	return sdk.Map(map[string]sdk.Value{})
-}
-
-func ParseBucketObjectIdentifier(val sdk.Value) (BucketObjectIdentifier, error) {
-	m, _ := sdk.ParseMap(val)
-
-	bucket, err := ParseIdentifier(m["bucket"])
-	if err != nil {
-		return BucketObjectIdentifier{}, err
-	}
-
-	name := m["name"].(sdk.StringValue)
-
-	return BucketObjectIdentifier{
-		Bucket: bucket,
-		Name:   name,
-	}, nil
-}
-
-func ParseIdentifier(val sdk.Value) (sdk.ResourceIdentifier, error) {
-	id, ok := val.(sdk.Identifier)
-	if !ok {
-		return sdk.Identifier{}, fmt.Errorf("not an identifier")
-	}
-
-	switch id.ResourceType {
-	case "bucket":
-		return ParseBucketIdentifier(id.Value)
-	case "bucket_object":
-		return ParseBucketObjectIdentifier(id.Value)
-	default:
-		return nil, fmt.Errorf("not a valid resource: %v", val.ResourceType)
-	}
-}
-
-type BucketGetter interface {
-	GetBucket(context.Context, BucketIdentifier) (Bucket, error)
-}
-
-type BucketCreator interface {
-	CreateBucket(context.Context, BucketIdentifier, BucketConfig) (Bucket, error)
-}
-
-type BucketUpdator interface {
-	UpdateBucket(context.Context, BucketIdentifier, BucketConfig) (Bucket, error)
-}
-
-type BucketDeleter interface {
-	DeleteBucket(context.Context, BucketIdentifier) error
-}
-
-type BucketObjectGetter interface {
-	GetBucketObject(context.Context, BucketObjectIdentifier) (BucketObject, error)
-}
-
-type BucketObjectCreator interface {
-	CreateBucketObject(context.Context, BucketObjectIdentifier, BucketObjectConfig) (BucketObject, error)
-}
-
-type BucketObjectUpdator interface {
-	UpdateBucketObject(context.Context, BucketObjectIdentifier, BucketObjectConfig) (BucketObject, error)
-}
-
-type BucketObjectDeleter interface {
-	DeleteBucketObject(context.Context, BucketObjectIdentifier) error
-}
-
 type ResourceHandler interface {
-	GetResource(context.Context, sdk.IdentifierValue) (sdk.ResourceValue, error)
-	CreateResource(context.Context, sdk.IdentifierValue, sdk.Value) (sdk.Resource, error)
-}
-
-type BucketHandler struct {
-	BucketGetter  BucketGetter
-	BucketCreator BucketCreator
-}
-
-type BucketObjectHandler struct {
-	BucketObjectGetter  BucketObjectGetter
-	BucketObjectCreator BucketObjectCreator
-}
-
-func (h BucketHandler) GetResource(ctx context.Context, id sdk.IdentifierValue) (sdk.ResourceValue, error) {
-	if h.BucketGetter == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
-	}
-
-	bucketID, err := ParseBucketIdentifier(id.Value)
-	if err != nil {
-		return sdk.ResourceValue{}, err
-	}
-
-	b, err := h.BucketGetter.GetBucket(ctx, bucketID)
-	if err != nil {
-		return sdk.ResourceValue{}, err
-	}
-
-	return b.ToResourceValue(), nil
-}
-
-func (h BucketHandler) CreateResource(ctx context.Context, id sdk.IdentifierValue, config sdk.Value) (sdk.ResourceValue, error) {
-	if h.BucketCreator == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
-	}
-
-	bucketID, err := ParseBucketIdentifier(id.Value)
-	if err != nil {
-		return sdk.ResourceValue{}, nil
-	}
-
-	bucketConfig := ParseBucketConfig(config)
-
-	b, err := h.BucketCreator.CreateBucket(ctx, bucketID, bucketConfig)
-	if err != nil {
-		return sdk.ResourceValue{}, err
-	}
-
-	return b.ToResourceValue(), nil
-}
-
-func (h BucketObjectHandler) GetResource(ctx context.Context, id sdk.IdentifierValue) (sdk.ResourceValue, error) {
-	if h.BucketObjectGetter == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
-	}
-
-	bucketObjectID, err := ParseBucketObjectIdentifier(id.Value)
-	if err != nil {
-		return sdk.ResourceValue{}, err
-	}
-
-	bo, err := h.BucketObjectGetter.GetBucketObject(ctx, bucketObjectID)
-	if err != nil {
-		return sdk.ResourceValue{}, err
-	}
-
-	return bo.ToResourceValue(), nil
-}
-
-func (h BucketObjectHandler) CreateResource(ctx context.Context, id *providerpb.Value, config *providerpb.Value) (*providerpb.Resource, error) {
-	// if h.BucketObjectCreator == nil {
-	// 	return nil, fmt.Errorf("unimplemented")
-	// }
-	//
-	// bucketObjectID := ParseBucketObjectIdentifier(id)
-	// bucketObjectConfig := ParseBucketObjectConfig(config)
-	//
-	// res, err := h.BucketObjectCreator.CreateBucketObject(ctx, bucketObjectID, bucketObjectConfig)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	//
-	// return res.ToStateValue().ToStateValueProto(), nil
-	return nil, nil
+	GetResource(context.Context, sdk.Identifier) (sdk.ResourceValue, error)
+	CreateResource(context.Context, sdk.Identifier, sdk.Value) (sdk.ResourceValue, error)
+	UpdateResource(context.Context, sdk.Identifier, sdk.Value) (sdk.ResourceValue, error)
+	DeleteResource(context.Context, sdk.Identifier) error
 }
 
 type Bucket struct {
-	Identifier BucketIdentifier
-	Config     BucketConfig
-	Attrs      BucketAttrs
 }
 
-func (b Bucket) ToResourceValue() sdk.ResourceValue {
-	return sdk.ResourceValue{
-		Identifier: b.Identifier.ToStateValue(),
-		Config:     b.Config.ToStateValue(),
-		Attrs:      b.Attrs.ToStateValue(),
-	}
-}
-
-func (b Bucket) GetBucket(ctx context.Context, id BucketIdentifier) (Bucket, error) {
-	config := BucketConfig{
+func (b Bucket) GetBucket(ctx context.Context, id provider.BucketIdentifier) (provider.Bucket, error) {
+	config := provider.BucketConfig{
 		Expiration: "1d",
 	}
-	attrs := BucketAttrs{
-		Bar: Bar{
+	attrs := provider.BucketAttrs{
+		Bar: provider.Bar{
 			Foo: "hi",
 		},
 	}
 
-	return Bucket{
+	return provider.Bucket{
 		Identifier: id,
 		Config:     config,
 		Attrs:      attrs,
 	}, nil
 }
 
-func (b Bucket) CreateBucket(ctx context.Context, id BucketIdentifier, config BucketConfig) (sdk.Resource, error) {
+func (b Bucket) CreateBucket(ctx context.Context, id provider.BucketIdentifier, config provider.BucketConfig) (provider.Bucket, error) {
 	config.Expiration = "12h"
 
-	attrs := BucketAttrs{
-		Bar: Bar{
+	attrs := provider.BucketAttrs{
+		Bar: provider.Bar{
 			Foo: "hi",
 		},
 	}
 
-	return Bucket{
+	return provider.Bucket{
 		Identifier: id,
 		Config:     config,
 		Attrs:      attrs,
 	}, nil
+}
+
+func (b Bucket) UpdateBucket(ctx context.Context, id provider.BucketIdentifier, config provider.BucketConfig) (provider.Bucket, error) {
+	attrs := provider.BucketAttrs{
+		Bar: provider.Bar{
+			Foo: "hi",
+		},
+	}
+	return provider.Bucket{
+		Identifier: id,
+		Config:     config,
+		Attrs:      attrs,
+	}, nil
+}
+
+func (b Bucket) DeleteBucket(ctx context.Context, id provider.BucketIdentifier) error {
+	return nil
 }
 
 type BucketObject struct {
-	Identifier BucketObjectIdentifier
-	Config     BucketObjectConfig
-	Attrs      BucketObjectAttrs
 }
 
-func (b BucketObject) ToResourceValue() sdk.ResourceValue {
-	return sdk.ResourceValue{
-		Identifier: b.Identifier.ToStateValue(),
-		Config:     b.Config.ToStateValue(),
-		Attrs:      b.Attrs.ToStateValue(),
-	}
-}
-
-func (b BucketObject) GetBucketObject(ctx context.Context, id BucketObjectIdentifier) (BucketObject, error) {
-	config := BucketObjectConfig{
+func (b BucketObject) GetBucketObject(ctx context.Context, id provider.BucketObjectIdentifier) (provider.BucketObject, error) {
+	config := provider.BucketObjectConfig{
 		Contents:  "blablabla",
 		SomeField: "hehe",
 	}
 
-	attrs := BucketObjectAttrs{}
+	attrs := provider.BucketObjectAttrs{}
 
-	return BucketObject{
+	return provider.BucketObject{
 		Identifier: id,
 		Config:     config,
 		Attrs:      attrs,
 	}, nil
 }
 
-func (b BucketObject) CreateBucketObject(ctx context.Context, id BucketObjectIdentifier, config BucketObjectConfig) (sdk.Resource, error) {
-	return sdk.Resource{
+func (b BucketObject) CreateBucketObject(ctx context.Context, id provider.BucketObjectIdentifier, config provider.BucketObjectConfig) (provider.BucketObject, error) {
+	return provider.BucketObject{
 		Identifier: id,
 		Config:     config,
-		Attrs:      BucketAttrs{},
+		Attrs:      provider.BucketObjectAttrs{},
 	}, nil
+}
+
+func (b BucketObject) UpdateBucketObject(ctx context.Context, id provider.BucketObjectIdentifier, config provider.BucketObjectConfig) (provider.BucketObject, error) {
+	return provider.BucketObject{
+		Identifier: id,
+		Config:     config,
+		Attrs:      provider.BucketObjectAttrs{},
+	}, nil
+}
+
+func (b BucketObject) DeleteBucketObject(ctx context.Context, id provider.BucketObjectIdentifier) error {
+	return nil
 }
 
 func (s *Server) GetResource(ctx context.Context, req *providerpb.GetResourceRequest) (*providerpb.GetResourceResponse, error) {
@@ -391,12 +122,12 @@ func (s *Server) GetResource(ctx context.Context, req *providerpb.GetResourceReq
 		return &providerpb.GetResourceResponse{}, status.Error(codes.NotFound, "resource type not found")
 	}
 
-	val, err := sdk.ParseProto(req.GetIdentifier())
+	id, err := sdk.ParseIdentifierProto(req.GetIdentifier().GetIdentifier())
 	if err != nil {
 		return &providerpb.GetResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	res, err := handler.GetResource(ctx, val.(sdk.IdentifierValue))
+	res, err := handler.GetResource(ctx, id)
 	if err != nil {
 		return &providerpb.GetResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
@@ -411,59 +142,65 @@ func (s *Server) CreateResource(ctx context.Context, req *providerpb.CreateResou
 		return &providerpb.CreateResourceResponse{}, status.Error(codes.NotFound, "resource type not found")
 	}
 
-	res, err := handler.CreateResource(ctx, req.GetIdentifier(), req.GetConfig())
+	id, err := sdk.ParseIdentifierProto(req.GetIdentifier().GetIdentifier())
 	if err != nil {
 		return &providerpb.CreateResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	return &providerpb.CreateResourceResponse{Resource: res}, nil
+	config, err := sdk.ParseProto(req.GetConfig())
+	if err != nil {
+		return &providerpb.CreateResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	res, err := handler.CreateResource(ctx, id, config)
+	if err != nil {
+		return &providerpb.CreateResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	return &providerpb.CreateResourceResponse{Resource: res.ToResourceProto()}, nil
 }
 
 func (s *Server) UpdateResource(ctx context.Context, req *providerpb.UpdateResourceRequest) (*providerpb.UpdateResourceResponse, error) {
-	// var r *providerpb.Resource
-	// switch req.GetIdentifier().GetIdentifier().GetType() {
-	// case "bucket":
-	// 	id := ParseBucketIdentifier(req.GetIdentifier())
-	//
-	// 	config := ParseBucketConfig(req.GetConfig())
-	//
-	// 	config.Expiration = "12h"
-	//
-	// 	attrs := BucketAttrs{
-	// 		Bar: Bar{
-	// 			Foo: "hi",
-	// 		},
-	// 	}
-	//
-	// 	r = sdk.Resource{
-	// 		Identifier: id,
-	// 		Config:     config,
-	// 		Attrs:      attrs,
-	// 	}.ToStateValue().ToStateValueProto()
-	// case "bucket_object":
-	// 	id := ParseBucketObjectIdentifier(req.GetIdentifier())
-	//
-	// 	config := ParseBucketObjectConfig(req.GetConfig())
-	// 	config.Contents = "blablablablablablabla"
-	// 	config.SomeField = "hi"
-	//
-	// 	attrs := BucketAttrs{}
-	//
-	// 	r = sdk.Resource{
-	// 		Identifier: id,
-	// 		Config:     config,
-	// 		Attrs:      attrs,
-	// 	}.ToStateValue().ToStateValueProto()
-	// default:
-	// 	return &providerpb.UpdateResourceResponse{}, status.Errorf(codes.InvalidArgument, "requires resource type")
-	// }
-	// return &providerpb.UpdateResourceResponse{
-	// 	Resource: r,
-	// }, nil
-	return nil, nil
+	t := req.GetIdentifier().GetIdentifier().GetType()
+	handler, ok := s.ResourceHandlers[t]
+	if !ok {
+		return &providerpb.UpdateResourceResponse{}, status.Error(codes.NotFound, "resource type not found")
+	}
+
+	id, err := sdk.ParseIdentifierProto(req.GetIdentifier().GetIdentifier())
+	if err != nil {
+		return &providerpb.UpdateResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	config, err := sdk.ParseProto(req.GetConfig())
+	if err != nil {
+		return &providerpb.UpdateResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	res, err := handler.UpdateResource(ctx, id, config)
+	if err != nil {
+		return &providerpb.UpdateResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	return &providerpb.UpdateResourceResponse{Resource: res.ToResourceProto()}, nil
 }
 
 func (s *Server) DeleteResource(ctx context.Context, req *providerpb.DeleteResourceRequest) (*providerpb.DeleteResourceResponse, error) {
+	t := req.GetIdentifier().GetIdentifier().GetType()
+	handler, ok := s.ResourceHandlers[t]
+	if !ok {
+		return &providerpb.DeleteResourceResponse{}, status.Error(codes.NotFound, "resource type not found")
+	}
+
+	id, err := sdk.ParseIdentifierProto(req.GetIdentifier().GetIdentifier())
+	if err != nil {
+		return &providerpb.DeleteResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	if err := handler.DeleteResource(ctx, id); err != nil {
+		return &providerpb.DeleteResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
 	return &providerpb.DeleteResourceResponse{}, nil
 }
 
@@ -478,13 +215,17 @@ func main() {
 			"backend": &Plugin{
 				BackendServer: &Server{
 					ResourceHandlers: map[string]ResourceHandler{
-						"bucket": BucketHandler{
-							BucketGetter: Bucket{},
-							// BucketCreator: Bucket{},
+						"bucket": provider.BucketHandler{
+							BucketGetter:  Bucket{},
+							BucketCreator: Bucket{},
+							BucketUpdator: Bucket{},
+							BucketDeleter: Bucket{},
 						},
-						"bucket_object": BucketObjectHandler{
+						"bucket_object": provider.BucketObjectHandler{
 							BucketObjectGetter:  BucketObject{},
 							BucketObjectCreator: BucketObject{},
+							BucketObjectUpdator: BucketObject{},
+							BucketObjectDeleter: BucketObject{},
 						},
 					},
 				},

@@ -23,6 +23,18 @@ type Value interface {
 	ToValueProto() *providerpb.Value
 }
 
+func ParseIdentifierProto(id *providerpb.Identifier) (Identifier, error) {
+	val, err := ParseProto(id.GetValue())
+	if err != nil {
+		return Identifier{}, err
+	}
+
+	return Identifier{
+		ResourceType: id.Type,
+		Value:        val,
+	}, nil
+}
+
 func ParseProto(val *providerpb.Value) (Value, error) {
 	switch v := val.GetType().(type) {
 	case *providerpb.Value_StringValue:

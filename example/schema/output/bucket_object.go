@@ -4,8 +4,140 @@
 package provider
 
 import (
+	"context"
+	"fmt"
+
 	sdk "github.com/alchematik/athanor-go/sdk/provider/value"
 )
+
+type BucketObject struct {
+	Identifier BucketObjectIdentifier
+	Config     BucketObjectConfig
+	Attrs      BucketObjectAttrs
+}
+
+func (x BucketObject) ToResourceValue() (sdk.ResourceValue, error) {
+	id, err := x.Identifier.ToValue()
+	if err != nil {
+		return sdk.ResourceValue{}, nil
+	}
+
+	config, err := x.Config.ToValue()
+	if err != nil {
+		return sdk.ResourceValue{}, nil
+	}
+
+	attrs, err := x.Attrs.ToValue()
+	if err != nil {
+		return sdk.ResourceValue{}, nil
+	}
+
+	return sdk.ResourceValue{
+		Identifier: id,
+		Config:     config,
+		Attrs:      attrs,
+	}, nil
+}
+
+type BucketObjectGetter interface {
+	GetBucketObject(context.Context, BucketObjectIdentifier) (BucketObject, error)
+}
+
+type BucketObjectCreator interface {
+	CreateBucketObject(context.Context, BucketObjectIdentifier, BucketObjectConfig) (BucketObject, error)
+}
+
+type BucketObjectUpdator interface {
+	UpdateBucketObject(context.Context, BucketObjectIdentifier, BucketObjectConfig) (BucketObject, error)
+}
+
+type BucketObjectDeleter interface {
+	DeleteBucketObject(context.Context, BucketObjectIdentifier) error
+}
+
+type BucketObjectHandler struct {
+	BucketObjectGetter  BucketObjectGetter
+	BucketObjectCreator BucketObjectCreator
+	BucketObjectUpdator BucketObjectUpdator
+	BucketObjectDeleter BucketObjectDeleter
+}
+
+func (h BucketObjectHandler) GetResource(ctx context.Context, id sdk.Identifier) (sdk.ResourceValue, error) {
+	if h.BucketObjectGetter == nil {
+		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+	}
+
+	idVal, err := ParseBucketObjectIdentifier(id.Value)
+	if err != nil {
+		return sdk.ResourceValue{}, err
+	}
+
+	r, err := h.BucketObjectGetter.GetBucketObject(ctx, idVal)
+	if err != nil {
+		return sdk.ResourceValue{}, err
+	}
+
+	return r.ToResourceValue()
+}
+
+func (h BucketObjectHandler) CreateResource(ctx context.Context, id sdk.Identifier, config sdk.Value) (sdk.ResourceValue, error) {
+	if h.BucketObjectCreator == nil {
+		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+	}
+
+	idVal, err := ParseBucketObjectIdentifier(id.Value)
+	if err != nil {
+		return sdk.ResourceValue{}, err
+	}
+
+	configVal, err := ParseBucketObjectConfig(config)
+	if err != nil {
+		return sdk.ResourceValue{}, err
+	}
+
+	r, err := h.BucketObjectCreator.CreateBucketObject(ctx, idVal, configVal)
+	if err != nil {
+		return sdk.ResourceValue{}, err
+	}
+
+	return r.ToResourceValue()
+}
+
+func (h BucketObjectHandler) UpdateResource(ctx context.Context, id sdk.Identifier, config sdk.Value) (sdk.ResourceValue, error) {
+	if h.BucketObjectUpdator == nil {
+		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+	}
+
+	idVal, err := ParseBucketObjectIdentifier(id.Value)
+	if err != nil {
+		return sdk.ResourceValue{}, err
+	}
+
+	configVal, err := ParseBucketObjectConfig(config)
+	if err != nil {
+		return sdk.ResourceValue{}, err
+	}
+
+	r, err := h.BucketObjectUpdator.UpdateBucketObject(ctx, idVal, configVal)
+	if err != nil {
+		return sdk.ResourceValue{}, err
+	}
+
+	return r.ToResourceValue()
+}
+
+func (h BucketObjectHandler) DeleteResource(ctx context.Context, id sdk.Identifier) error {
+	if h.BucketObjectDeleter == nil {
+		return fmt.Errorf("unimplemented")
+	}
+
+	idVal, err := ParseBucketObjectIdentifier(id.Value)
+	if err != nil {
+		return err
+	}
+
+	return h.BucketObjectDeleter.DeleteBucketObject(ctx, idVal)
+}
 
 type BucketObjectAttrs struct {
 }
@@ -14,6 +146,11 @@ func (x BucketObjectAttrs) ToValue() (sdk.Value, error) {
 
 	return sdk.Map{}, nil
 
+}
+
+func ParseBucketObjectAttrs(v sdk.Value) (BucketObjectAttrs, error) {
+
+	return BucketObjectAttrs{}, nil
 }
 
 type BucketObjectConfig struct {
@@ -38,8 +175,30 @@ func (x BucketObjectConfig) ToValue() (sdk.Value, error) {
 
 }
 
+func ParseBucketObjectConfig(v sdk.Value) (BucketObjectConfig, error) {
+
+	m, err := sdk.ParseMap(v)
+	if err != nil {
+		return BucketObjectConfig{}, nil
+	}
+
+	contents, err := sdk.ParseStringValue(m["contents"])
+	if err != nil {
+		return BucketObjectConfig{}, nil
+	}
+	some_field, err := sdk.ParseStringValue(m["some_field"])
+	if err != nil {
+		return BucketObjectConfig{}, nil
+	}
+
+	return BucketObjectConfig{
+		Contents:  contents,
+		SomeField: some_field,
+	}, nil
+}
+
 type BucketObjectIdentifier struct {
-	Bucket sdk.Identifier
+	Bucket sdk.ResourceIdentifier
 	Name   string
 }
 
@@ -65,4 +224,26 @@ func (x BucketObjectIdentifier) ToValue() (sdk.Value, error) {
 		},
 	}, nil
 
+}
+
+func ParseBucketObjectIdentifier(v sdk.Value) (BucketObjectIdentifier, error) {
+
+	m, err := sdk.ParseMap(v)
+	if err != nil {
+		return BucketObjectIdentifier{}, nil
+	}
+
+	bucket, err := ParseIdentifier(m["bucket"])
+	if err != nil {
+		return BucketObjectIdentifier{}, nil
+	}
+	name, err := sdk.ParseStringValue(m["name"])
+	if err != nil {
+		return BucketObjectIdentifier{}, nil
+	}
+
+	return BucketObjectIdentifier{
+		Bucket: bucket,
+		Name:   name,
+	}, nil
 }

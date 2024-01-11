@@ -127,6 +127,46 @@ func (s *Server) GenerateProviderSDK(ctx context.Context, req *translatorpb.Gene
 		types[resourceName] = resourceTypes
 	}
 
+	providerFile, err := os.Create(filepath.Join(req.GetOutputPath(), "provider.go"))
+	if err != nil {
+		return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	tmpl, err := template.New("provider").
+		Funcs(template.FuncMap{
+			"toPascalCase": toPascalCase,
+		}).
+		Parse(providerTmpl)
+	if err != nil {
+		return nil, err
+	}
+
+	typeNames := make([]string, 0, len(types))
+	for k := range types {
+		typeNames = append(typeNames, k)
+	}
+
+	sort.Strings(typeNames)
+
+	providerData := map[string]any{
+		"PackageName": "provider",
+		"Types":       typeNames,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, providerData); err != nil {
+		return nil, err
+	}
+
+	src, err := format.Source(buf.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := providerFile.Write(src); err != nil {
+		return nil, err
+	}
+
 	for resource, resourceTypes := range types {
 		f, err := os.Create(filepath.Join(req.GetOutputPath(), resource+".go"))
 		if err != nil {
@@ -191,22 +231,24 @@ var structTypeTmpl string
 //go:embed string_type.tmpl
 var stringTypeTmpl string
 
-/*
-
-- Generate Parse func
-
-*/
+//go:embed provider.tmpl
+var providerTmpl string
 
 func GenerateResourceType(name string, types []*providerpb.FieldSchema) ([]byte, error) {
 	var out []byte
 
-	tmpl, err := template.New("resource_header").Parse(resourceHeaderTmpl)
+	tmpl, err := template.New("resource_header").
+		Funcs(template.FuncMap{
+			"toPascalCase": toPascalCase,
+		}).
+		Parse(resourceHeaderTmpl)
 	if err != nil {
 		return nil, err
 	}
 
 	data := map[string]any{
 		"PackageName": "provider",
+		"Type":        toPascalCase(name),
 	}
 
 	var buf bytes.Buffer
@@ -223,9 +265,22 @@ func GenerateResourceType(name string, types []*providerpb.FieldSchema) ([]byte,
 			tmpl, err := template.New("struct_type").
 				Funcs(template.FuncMap{
 					"toPascalCase": toPascalCase,
+					"parseFieldFunc": func(f *providerpb.FieldSchema) (string, error) {
+						if f.IsIdentifier {
+							return "ParseIdentifier", nil
+						}
+						switch f.GetType() {
+						case providerpb.FieldType_STRING:
+							return "sdk.ParseStringValue", nil
+						case providerpb.FieldType_STRUCT:
+							return fmt.Sprintf("Parse%s", toPascalCase(f.Name)), nil
+						default:
+							return "", fmt.Errorf("unsupported type %s", f.GetType())
+						}
+					},
 					"toType": func(f *providerpb.FieldSchema) (string, error) {
 						if f.GetIsIdentifier() {
-							return "sdk.Identifier", nil
+							return "sdk.ResourceIdentifier", nil
 						}
 
 						switch f.GetType() {
