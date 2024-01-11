@@ -1,0 +1,38 @@
+type {{ toPascalCase .Type.Name }} struct {
+{{ range .Type.Fields -}}
+  {{ toPascalCase .Name }} {{ toType . }}
+{{ end }}
+}
+
+{{ if .Type.IsIdentifier }}
+func (x {{ toPascalCase .Type.Name }}) ResourceType() string {
+  return "{{ .ResourceName }}"
+}
+{{ end }}
+
+func (x {{ toPascalCase .Type.Name }}) ToValue() (sdk.Value, error) {
+{{ range .Type.Fields -}}
+  {{ .Name }}, err := sdk.ToValue(x.{{ toPascalCase .Name }})
+  if err != nil {
+    return nil, err
+  }
+{{ end }}
+
+{{ if .Type.IsIdentifier -}}
+  return sdk.Identifier{
+    ResourceType: x.ResourceType(),
+    Value: sdk.Map{
+  {{ range .Type.Fields -}}
+    "{{ .Name }}": {{ .Name }},
+  {{ end }}
+    },
+  }, nil
+{{ else -}}
+  return sdk.Map{
+  {{ range .Type.Fields -}}
+    "{{ .Name }}": {{ .Name }},
+  {{ end }}
+  }, nil
+{{ end }}
+}
+

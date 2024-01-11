@@ -1,101 +1,54 @@
 package value
 
 import (
+	"fmt"
 	providerpb "github.com/alchematik/athanor-go/internal/gen/go/proto/provider/v1"
 )
 
-type Type interface {
-	ToStateValue() StateValue
+type ResourceField interface {
+	ToValue() (Value, error)
 }
 
-type IdentifierType interface {
-	Type
+type ResourceIdentifier interface {
+	ResourceField
 
 	ResourceType() string
 }
 
-func String(s string) StringType {
-	return StringType(s)
+type Resource interface {
+	ToResourceValue() ResourceValue
 }
 
-type StringType string
-
-func (s StringType) ToStateValue() StateValue {
-	return StringStateValue(s)
+type Value interface {
+	ToValueProto() *providerpb.Value
 }
 
-func Bool(b bool) BoolType {
-	return BoolType(b)
-}
+func ParseProto(val *providerpb.Value) (Value, error) {
+	switch v := val.GetType().(type) {
+	case *providerpb.Value_StringValue:
+		return String(v.StringValue), nil
+	default:
+		return nil, fmt.Errorf("unhandled proto type: %T", v)
 
-type BoolType bool
-
-func (b BoolType) ToStateValue() StateValue {
-	return BoolStateValue(b)
-}
-
-func Map(m map[string]Type) MapType {
-	return MapType(m)
-}
-
-type MapType map[string]Type
-
-func (m MapType) ToStateValue() StateValue {
-	val := MapStateValue{}
-	for k, v := range m {
-		val[k] = v.ToStateValue()
-	}
-
-	return val
-}
-
-// func Identifier(t string, val Type) IdentifierType {
-// 	return IdentifierType{
-// 		ResourceType: t,
-// 		Value:        val,
-// 	}
-// }
-
-// type IdentifierType struct {
-// 	ResourceType string
-// 	Value        Type
-// }
-
-// func (id IdentifierType) ToStateValue() StateValue {
-// 	return IdentifierStateValue{
-// 		ResourceType: id.ResourceType,
-// 		Value:        id.Value.ToStateValue(),
-// 	}
-// }
-
-type Resource struct {
-	Identifier IdentifierType
-	Config     Type
-	Attrs      Type
-}
-
-func (r Resource) ToStateValue() ResourceStateValue {
-	return ResourceStateValue{
-		Identifier: IdentifierStateValue{
-			ResourceType: r.Identifier.ResourceType(),
-			Value:        r.Identifier.Value().ToStateValue(),
-		},
-		Config: r.Config.ToStateValue(),
-		Attrs:  r.Attrs.ToStateValue(),
 	}
 }
 
-type StateValue interface {
-	ToStateValueProto() *providerpb.Value
+func ToValue(val any) (Value, error) {
+	switch v := val.(type) {
+	case string:
+		return String(v), nil
+	case bool:
+		return Bool(v), nil
+	case ResourceIdentifier:
+		return v.ToValue()
+	default:
+		return nil, fmt.Errorf("cannot convert type %T to Value", val)
+	}
 }
 
-// type IdentifierStateValue interface {
-// 	ToIdentifierStateValueProto() *providerpb.Identifier
-// }
+type Bool bool
 
-type BoolStateValue bool
-
-func (b BoolStateValue) ToStateValueProto() *providerpb.Value {
+func (b Bool) ToValueProto() *providerpb.Value {
 	return &providerpb.Value{
 		Type: &providerpb.Value_BoolValue{
 			BoolValue: bool(b),
@@ -103,9 +56,22 @@ func (b BoolStateValue) ToStateValueProto() *providerpb.Value {
 	}
 }
 
-type StringStateValue string
+func ToStringValue(str string) String {
+	return String(str)
+}
 
-func (s StringStateValue) ToStateValueProto() *providerpb.Value {
+func ParseStringValue(val Value) (string, error) {
+	s, ok := val.(String)
+	if !ok {
+		return "", fmt.Errorf("not a string")
+	}
+
+	return string(s), nil
+}
+
+type String string
+
+func (s String) ToValueProto() *providerpb.Value {
 	return &providerpb.Value{
 		Type: &providerpb.Value_StringValue{
 			StringValue: string(s),
@@ -113,12 +79,21 @@ func (s StringStateValue) ToStateValueProto() *providerpb.Value {
 	}
 }
 
-type MapStateValue map[string]StateValue
+func ParseMap(val Value) (map[string]Value, error) {
+	m, ok := val.(Map)
+	if !ok {
+		return nil, fmt.Errorf("not a map")
+	}
 
-func (m MapStateValue) ToStateValueProto() *providerpb.Value {
+	return map[string]Value(m), nil
+}
+
+type Map map[string]Value
+
+func (m Map) ToValueProto() *providerpb.Value {
 	p := map[string]*providerpb.Value{}
 	for k, v := range m {
-		p[k] = v.ToStateValueProto()
+		p[k] = v.ToValueProto()
 	}
 
 	return &providerpb.Value{
@@ -130,32 +105,32 @@ func (m MapStateValue) ToStateValueProto() *providerpb.Value {
 	}
 }
 
-type IdentifierStateValue struct {
+type Identifier struct {
 	ResourceType string
-	Value        StateValue
+	Value        Value
 }
 
-func (id IdentifierStateValue) ToStateValueProto() *providerpb.Value {
+func (id Identifier) ToValueProto() *providerpb.Value {
 	return &providerpb.Value{
 		Type: &providerpb.Value_Identifier{
 			Identifier: &providerpb.Identifier{
 				Type:  id.ResourceType,
-				Value: id.Value.ToStateValueProto(),
+				Value: id.Value.ToValueProto(),
 			},
 		},
 	}
 }
 
-type ResourceStateValue struct {
-	Identifier IdentifierStateValue
-	Config     StateValue
-	Attrs      StateValue
+type ResourceValue struct {
+	Identifier Value
+	Config     Value
+	Attrs      Value
 }
 
-func (r ResourceStateValue) ToStateValueProto() *providerpb.Resource {
+func (r ResourceValue) ToResourceProto() *providerpb.Resource {
 	return &providerpb.Resource{
-		Identifier: r.Identifier.ToStateValueProto(),
-		Config:     r.Config.ToStateValueProto(),
-		Attrs:      r.Attrs.ToStateValueProto(),
+		Identifier: r.Identifier.ToValueProto(),
+		Config:     r.Config.ToValueProto(),
+		Attrs:      r.Attrs.ToValueProto(),
 	}
 }
