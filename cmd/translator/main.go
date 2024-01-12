@@ -11,6 +11,7 @@ import (
 
 	providerpb "github.com/alchematik/athanor-go/internal/gen/go/proto/provider/v1"
 	translatorpb "github.com/alchematik/athanor-go/internal/gen/go/proto/translator/v1"
+	"github.com/alchematik/athanor-go/internal/generate/consumer"
 	"github.com/alchematik/athanor-go/internal/generate/provider"
 
 	"github.com/hashicorp/go-plugin"
@@ -115,5 +116,40 @@ func (s *Server) GenerateProviderSDK(ctx context.Context, req *translatorpb.Gene
 }
 
 func (s *Server) GenerateConsumerSDK(ctx context.Context, req *translatorpb.GenerateConsumerSDKRequest) (*translatorpb.GenerateConsumerSDKResponse, error) {
-	return nil, nil
+	data, err := os.ReadFile(req.GetInputPath())
+	if err != nil {
+		return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	var schema providerpb.Schema
+	if err := json.Unmarshal(data, &schema); err != nil {
+		return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	if err := os.MkdirAll(req.GetOutputPath(), 0777); err != nil {
+		return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	resources := schema.GetResources()
+	sort.Slice(resources, func(i, j int) bool {
+		return resources[i].GetType() < resources[j].GetType()
+	})
+
+	for _, resource := range resources {
+		f, err := os.Create(filepath.Join(req.GetOutputPath(), resource.GetType()+".go"))
+		if err != nil {
+			return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
+		}
+
+		src, err := consumer.GenerateResource(resource)
+		if err != nil {
+			return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
+		}
+
+		if _, err := f.Write(src); err != nil {
+			return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
+		}
+	}
+
+	return &translatorpb.GenerateConsumerSDKResponse{}, nil
 }

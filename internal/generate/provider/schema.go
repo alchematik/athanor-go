@@ -6,22 +6,19 @@ import (
 	"fmt"
 	"go/format"
 	"sort"
-	"strings"
 	"text/template"
 
 	providerpb "github.com/alchematik/athanor-go/internal/gen/go/proto/provider/v1"
-
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
+	util "github.com/alchematik/athanor-go/internal/generate/template"
 )
 
-//go:embed template/resource.tmpl
+//go:embed resource.tmpl
 var resourceTmpl string
 
-//go:embed template/struct_type.tmpl
+//go:embed struct_type.tmpl
 var structTypeTmpl string
 
-//go:embed template/provider.tmpl
+//go:embed provider.tmpl
 var providerTmpl string
 
 func GenerateProviderCommonSrc(schema *providerpb.Schema) ([]byte, error) {
@@ -37,7 +34,7 @@ func GenerateProviderCommonSrc(schema *providerpb.Schema) ([]byte, error) {
 
 	tmpl, err := template.New("provider").
 		Funcs(template.FuncMap{
-			"toPascalCase": toPascalCase,
+			"toPascalCase": util.PascalCase,
 		}).
 		Parse(providerTmpl)
 	if err != nil {
@@ -67,7 +64,7 @@ func GenerateResourceSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
 
 	tmpl, err := template.New("resource").
 		Funcs(template.FuncMap{
-			"toPascalCase": toPascalCase,
+			"toPascalCase": util.PascalCase,
 		}).
 		Parse(resourceTmpl)
 	if err != nil {
@@ -76,7 +73,7 @@ func GenerateResourceSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
 
 	data := map[string]any{
 		"PackageName": "provider",
-		"Type":        toPascalCase(name),
+		"Type":        util.PascalCase(name),
 	}
 
 	var buf bytes.Buffer
@@ -163,7 +160,7 @@ func addTypes(types map[string]*providerpb.FieldSchema, field *providerpb.FieldS
 func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) {
 	tmpl, err := template.New("struct_type").
 		Funcs(template.FuncMap{
-			"toPascalCase": toPascalCase,
+			"toPascalCase": util.PascalCase,
 			"parseFieldFunc": func(f *providerpb.FieldSchema) (string, error) {
 				if f.IsIdentifier {
 					return "ParseIdentifier", nil
@@ -172,7 +169,7 @@ func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) 
 				case providerpb.FieldType_STRING:
 					return "sdk.ParseStringValue", nil
 				case providerpb.FieldType_STRUCT:
-					return fmt.Sprintf("Parse%s", toPascalCase(f.Name)), nil
+					return fmt.Sprintf("Parse%s", util.PascalCase(f.Name)), nil
 				default:
 					return "", fmt.Errorf("unsupported type %s", f.GetType())
 				}
@@ -186,7 +183,7 @@ func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) 
 				case providerpb.FieldType_STRING:
 					return "string", nil
 				case providerpb.FieldType_STRUCT:
-					return toPascalCase(f.GetName()), nil
+					return util.PascalCase(f.GetName()), nil
 				default:
 					return "", fmt.Errorf("unrecognized type: %s", f.GetType())
 				}
@@ -208,33 +205,4 @@ func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) 
 	}
 
 	return buffer.Bytes(), nil
-}
-
-func toPascalCase(str string) string {
-	titleCaser := cases.Title(language.Und)
-	upperCaser := cases.Upper(language.Und)
-	splitter := func(r rune) bool {
-		return r == '_' || r == ' '
-	}
-	parts := strings.FieldsFunc(str, splitter)
-	if len(parts) == 1 {
-		part := parts[0]
-		if upperCaser.String(part) == part {
-			return part
-		}
-
-		return titleCaser.String(parts[0])
-	}
-
-	var transformed []string
-	for _, part := range parts {
-		if upperCaser.String(part) == part {
-			transformed = append(transformed, part)
-			continue
-		}
-
-		transformed = append(transformed, titleCaser.String(part))
-	}
-
-	return strings.Join(transformed, "")
 }
