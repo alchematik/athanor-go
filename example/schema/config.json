@@ -1,13 +1,13 @@
 {
   "input_path": "./example/schema",
-  "output_path": "./example/schema/output",
+  "output_path": "./example/schema/output/provider",
   "translator": {
     "name": "go",
     "version": "v0.0.1"
   },
   "client_sdk": [
     {
-      "output_path": "./test/out/go",
+      "output_path": "./example/schema/output/consumer",
       "translator": {
         "name": "go",
         "version": "v0.0.1"

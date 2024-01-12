@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	provider "github.com/alchematik/athanor-go/example/schema/output"
+	provider "github.com/alchematik/athanor-go/example/schema/output/provider"
 	plugin "github.com/alchematik/athanor-go/sdk/provider/plugin"
 )
 
