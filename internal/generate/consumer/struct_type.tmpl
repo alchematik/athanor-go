@@ -1,0 +1,29 @@
+type {{ toPascalCase .Type.Name }} struct {
+{{ if .Type.IsIdentifier }}
+  Alias string
+{{ end }}
+{{ range .Type.Fields -}}
+  {{ toPascalCase .Name }} sdk.Type
+{{ end }}
+}
+
+func (x {{ toPascalCase .Type.Name }}) ToExpr() sdk.Expr {
+{{ if .Type.IsIdentifier }}
+  return sdk.ResourceIdentifier(
+    "{{ .ResourceName }}",
+    x.Alias,
+    sdk.Map(map[string]sdk.Type{
+  {{ range .Type.Fields -}}
+    "{{ .Name }}": x.{{ toPascalCase .Name }},
+  {{ end }}
+
+    }),
+  ).ToExpr()
+{{ else }}
+  return sdk.Map(map[string]sdk.Type{
+  {{ range .Type.Fields -}}
+    "{{ .Name }}": x.{{ toPascalCase .Name }},
+  {{ end }}
+  }).ToExpr()
+{{ end }}
+}

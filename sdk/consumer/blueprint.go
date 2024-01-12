@@ -2,7 +2,7 @@ package sdk
 
 import (
 	"encoding/json"
-	"fmt"
+	// "fmt"
 	blueprintpb "github.com/alchematik/athanor-go/internal/gen/go/proto/blueprint/v1"
 	"os"
 )
@@ -223,22 +223,22 @@ func (g IOGetType) ToExpr() Expr {
 	}
 }
 
-func (g IOGetType) Get(name string) GetType {
-	return GetType{
+func (g IOGetType) IOGet(name string) IOGetType {
+	return IOGetType{
 		Name:   name,
 		Object: g,
 	}
 }
 
 func Build(bp Blueprint) error {
-	p := bp.toProto()
+	outputPath := os.Args[1]
 
-	f, err := os.CreateTemp("", "")
+	f, err := os.OpenFile(outputPath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("TEMP FILE: %v\n", f.Name())
+	p := bp.toProto()
 
 	data, err := json.Marshal(p)
 	if err != nil {

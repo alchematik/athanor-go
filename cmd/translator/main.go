@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -60,6 +61,16 @@ func (s *Server) TranslateProviderSchema(ctx context.Context, req *translatorpb.
 	}
 
 	return &translatorpb.TranslateProviderSchemaResponse{}, nil
+}
+
+func (s *Server) TranslateBlueprint(ctx context.Context, req *translatorpb.TranslateBlueprintRequest) (*translatorpb.TranslateBlueprintResponse, error) {
+	log.Printf("GETTING TRANSLATE BLUEPRINT %v\n", req.GetInputPath())
+	if err := exec.Command("go", "run", req.GetInputPath(), req.GetOutputPath()).Run(); err != nil {
+		log.Printf("ERROR WHILE TRANSLATING BLUEPRINT: %v\n", err.Error())
+		return &translatorpb.TranslateBlueprintResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	return &translatorpb.TranslateBlueprintResponse{}, nil
 }
 
 func (s *Server) GenerateProviderSDK(ctx context.Context, req *translatorpb.GenerateProviderSDKRequest) (*translatorpb.GenerateProvierSDKResponse, error) {
@@ -141,7 +152,7 @@ func (s *Server) GenerateConsumerSDK(ctx context.Context, req *translatorpb.Gene
 			return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
 		}
 
-		src, err := consumer.GenerateResource(resource)
+		src, err := consumer.GenerateResourceSrc(resource)
 		if err != nil {
 			return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
 		}

@@ -81,6 +81,8 @@ func GenerateResourceSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
 		return nil, err
 	}
 
+	out := buf.Bytes()
+
 	typesMap := map[string]*providerpb.FieldSchema{}
 
 	id := resource.GetIdentifier()
@@ -117,7 +119,6 @@ func GenerateResourceSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
 		resourceTypes[i] = typesMap[name]
 	}
 
-	out := buf.Bytes()
 	for _, t := range resourceTypes {
 		switch t.GetType() {
 		case providerpb.FieldType_STRUCT:
