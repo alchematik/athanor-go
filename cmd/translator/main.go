@@ -1,25 +1,20 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"go/format"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strings"
-	"text/template"
 
 	providerpb "github.com/alchematik/athanor-go/internal/gen/go/proto/provider/v1"
 	translatorpb "github.com/alchematik/athanor-go/internal/gen/go/proto/translator/v1"
+	"github.com/alchematik/athanor-go/internal/generate/provider"
 
 	"github.com/hashicorp/go-plugin"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -82,45 +77,19 @@ func (s *Server) GenerateProviderSDK(ctx context.Context, req *translatorpb.Gene
 		return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
+	resources := schema.GetResources()
+	sort.Slice(resources, func(i, j int) bool {
+		return resources[i].GetType() < resources[j].GetType()
+	})
+
+	var resourceNames []string
 	types := map[string][]*providerpb.FieldSchema{}
 	for _, resource := range schema.GetResources() {
+		resourceNames = append(resourceNames, resource.GetType())
 
-		m := map[string]*providerpb.FieldSchema{}
-
-		id := resource.GetIdentifier()
-		id.Name = resource.GetType() + "_identifier"
-		m[id.Name] = id
-
-		config := resource.GetConfig()
-		config.Name = resource.GetType() + "_config"
-		m[config.Name] = config
-
-		attrs := resource.GetAttrs()
-		attrs.Name = resource.GetType() + "_attrs"
-		m[attrs.Name] = attrs
-
-		if err := addTypes(m, id); err != nil {
+		resourceTypes, err := findResourceTypes(resource)
+		if err != nil {
 			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
-		}
-
-		if err := addTypes(m, config); err != nil {
-			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
-		}
-
-		if err := addTypes(m, attrs); err != nil {
-			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
-		}
-
-		var names []string
-		for k := range m {
-			names = append(names, k)
-		}
-
-		sort.Strings(names)
-
-		resourceTypes := make([]*providerpb.FieldSchema, len(names))
-		for i, name := range names {
-			resourceTypes[i] = m[name]
 		}
 
 		resourceName := resource.GetType()
@@ -132,33 +101,7 @@ func (s *Server) GenerateProviderSDK(ctx context.Context, req *translatorpb.Gene
 		return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	tmpl, err := template.New("provider").
-		Funcs(template.FuncMap{
-			"toPascalCase": toPascalCase,
-		}).
-		Parse(providerTmpl)
-	if err != nil {
-		return nil, err
-	}
-
-	typeNames := make([]string, 0, len(types))
-	for k := range types {
-		typeNames = append(typeNames, k)
-	}
-
-	sort.Strings(typeNames)
-
-	providerData := map[string]any{
-		"PackageName": "provider",
-		"Types":       typeNames,
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, providerData); err != nil {
-		return nil, err
-	}
-
-	src, err := format.Source(buf.Bytes())
+	src, err := provider.GenerateProvider(resourceNames)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +116,7 @@ func (s *Server) GenerateProviderSDK(ctx context.Context, req *translatorpb.Gene
 			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 		}
 
-		d, err := GenerateResourceType(resource, resourceTypes)
+		d, err := provider.GenerateResource(resource, resourceTypes)
 		if err != nil {
 			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 		}
@@ -183,21 +126,53 @@ func (s *Server) GenerateProviderSDK(ctx context.Context, req *translatorpb.Gene
 		}
 	}
 
-	/*
-
-		TODO:
-			- Generate resource
-				- identifier
-				- config
-				- attrs
-				- any structs
-	*/
-
 	return &translatorpb.GenerateProvierSDKResponse{}, nil
 }
 
 func (s *Server) GenerateConsumerSDK(ctx context.Context, req *translatorpb.GenerateConsumerSDKRequest) (*translatorpb.GenerateConsumerSDKResponse, error) {
 	return nil, nil
+}
+
+func findResourceTypes(resource *providerpb.ResourceSchema) ([]*providerpb.FieldSchema, error) {
+	m := map[string]*providerpb.FieldSchema{}
+
+	id := resource.GetIdentifier()
+	id.Name = resource.GetType() + "_identifier"
+	m[id.Name] = id
+
+	config := resource.GetConfig()
+	config.Name = resource.GetType() + "_config"
+	m[config.Name] = config
+
+	attrs := resource.GetAttrs()
+	attrs.Name = resource.GetType() + "_attrs"
+	m[attrs.Name] = attrs
+
+	if err := addTypes(m, id); err != nil {
+		return nil, err
+	}
+
+	if err := addTypes(m, config); err != nil {
+		return nil, err
+	}
+
+	if err := addTypes(m, attrs); err != nil {
+		return nil, err
+	}
+
+	var names []string
+	for k := range m {
+		names = append(names, k)
+	}
+
+	sort.Strings(names)
+
+	resourceTypes := make([]*providerpb.FieldSchema, len(names))
+	for i, name := range names {
+		resourceTypes[i] = m[name]
+	}
+
+	return resourceTypes, nil
 }
 
 func addTypes(types map[string]*providerpb.FieldSchema, field *providerpb.FieldSchema) error {
@@ -220,144 +195,4 @@ func addTypes(types map[string]*providerpb.FieldSchema, field *providerpb.FieldS
 	}
 
 	return nil
-}
-
-//go:embed resource_header.tmpl
-var resourceHeaderTmpl string
-
-//go:embed struct_type.tmpl
-var structTypeTmpl string
-
-//go:embed string_type.tmpl
-var stringTypeTmpl string
-
-//go:embed provider.tmpl
-var providerTmpl string
-
-func GenerateResourceType(name string, types []*providerpb.FieldSchema) ([]byte, error) {
-	var out []byte
-
-	tmpl, err := template.New("resource_header").
-		Funcs(template.FuncMap{
-			"toPascalCase": toPascalCase,
-		}).
-		Parse(resourceHeaderTmpl)
-	if err != nil {
-		return nil, err
-	}
-
-	data := map[string]any{
-		"PackageName": "provider",
-		"Type":        toPascalCase(name),
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return nil, err
-	}
-
-	out = append(out, buf.Bytes()...)
-
-	for _, t := range types {
-		switch t.GetType() {
-		case providerpb.FieldType_STRING:
-		case providerpb.FieldType_STRUCT:
-			tmpl, err := template.New("struct_type").
-				Funcs(template.FuncMap{
-					"toPascalCase": toPascalCase,
-					"parseFieldFunc": func(f *providerpb.FieldSchema) (string, error) {
-						if f.IsIdentifier {
-							return "ParseIdentifier", nil
-						}
-						switch f.GetType() {
-						case providerpb.FieldType_STRING:
-							return "sdk.ParseStringValue", nil
-						case providerpb.FieldType_STRUCT:
-							return fmt.Sprintf("Parse%s", toPascalCase(f.Name)), nil
-						default:
-							return "", fmt.Errorf("unsupported type %s", f.GetType())
-						}
-					},
-					"toType": func(f *providerpb.FieldSchema) (string, error) {
-						if f.GetIsIdentifier() {
-							return "sdk.ResourceIdentifier", nil
-						}
-
-						switch f.GetType() {
-						case providerpb.FieldType_STRING:
-							return "string", nil
-						case providerpb.FieldType_STRUCT:
-							return toPascalCase(f.GetName()), nil
-						default:
-							return "", fmt.Errorf("unrecognized type: %s", f.GetType())
-						}
-					},
-				}).
-				Parse(structTypeTmpl)
-			if err != nil {
-				return nil, err
-			}
-
-			data := map[string]any{
-				"ResourceName": name,
-				"Type":         t,
-			}
-
-			var buffer bytes.Buffer
-			if err := tmpl.Execute(&buffer, data); err != nil {
-				return nil, err
-			}
-
-			out = append(out, buffer.Bytes()...)
-		}
-	}
-
-	src, err := format.Source(out)
-	if err != nil {
-		return nil, err
-	}
-
-	return src, nil
-}
-
-func toPascalCase(str string) string {
-	titleCaser := cases.Title(language.Und)
-	upperCaser := cases.Upper(language.Und)
-	splitter := func(r rune) bool {
-		return r == '_' || r == ' '
-	}
-	parts := strings.FieldsFunc(str, splitter)
-	if len(parts) == 1 {
-		part := parts[0]
-		if upperCaser.String(part) == part {
-			return part
-		}
-
-		return titleCaser.String(parts[0])
-	}
-
-	var transformed []string
-	for _, part := range parts {
-		if upperCaser.String(part) == part {
-			transformed = append(transformed, part)
-			continue
-		}
-
-		transformed = append(transformed, titleCaser.String(part))
-	}
-
-	return strings.Join(transformed, "")
-}
-
-func findStructFields(field *providerpb.FieldSchema) []*providerpb.FieldSchema {
-	// Use map?
-	// Put all structs across resources in same package?
-	var structFields []*providerpb.FieldSchema
-	for _, f := range field.GetFields() {
-		if f.GetType() == providerpb.FieldType_STRUCT {
-			structFields = append(structFields, f)
-		}
-	}
-
-	return structFields
 }
