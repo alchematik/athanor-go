@@ -1,8 +1,7 @@
 package main
 
 import (
-	"encoding/json"
-	"os"
+	"log"
 
 	"github.com/alchematik/athanor-go/sdk/provider/schema"
 )
@@ -105,23 +104,7 @@ func main() {
 		},
 	}
 
-	p := s.ToProto()
-
-	outputPath := os.Args[1]
-
-	f, err := os.OpenFile(outputPath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
-	if err != nil {
-		os.Exit(1)
+	if err := schema.Build(s); err != nil {
+		log.Fatalf("error building provider: %v", err)
 	}
-
-	data, err := json.Marshal(p)
-	if err != nil {
-		os.Exit(1)
-	}
-
-	if _, err := f.Write(data); err != nil {
-		os.Exit(1)
-	}
-
-	os.Exit(0)
 }

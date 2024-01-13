@@ -37,6 +37,6 @@ func main() {
 	bp = bp.WithResource(sdk.Resource(sdk.Bool(true), p, objectID, objectConfig))
 
 	if err := sdk.Build(bp); err != nil {
-		log.Fatalf("error building blueprint: %v\n", err)
+		log.Fatalf("error building blueprint: %v", err)
 	}
 }
