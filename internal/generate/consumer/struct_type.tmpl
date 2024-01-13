@@ -1,5 +1,5 @@
 type {{ toPascalCase .Type.Name }} struct {
-{{ if .Type.IsIdentifier }}
+{{ if .Type.IsIdentifier -}}
   Alias string
 {{ end }}
 {{ range .Type.Fields -}}
@@ -8,7 +8,7 @@ type {{ toPascalCase .Type.Name }} struct {
 }
 
 func (x {{ toPascalCase .Type.Name }}) ToExpr() sdk.Expr {
-{{ if .Type.IsIdentifier }}
+{{ if .Type.IsIdentifier -}}
   return sdk.ResourceIdentifier(
     "{{ .ResourceName }}",
     x.Alias,
@@ -16,14 +16,13 @@ func (x {{ toPascalCase .Type.Name }}) ToExpr() sdk.Expr {
   {{ range .Type.Fields -}}
     "{{ .Name }}": x.{{ toPascalCase .Name }},
   {{ end }}
-
     }),
   ).ToExpr()
-{{ else }}
+{{ else -}}
   return sdk.Map(map[string]sdk.Type{
   {{ range .Type.Fields -}}
     "{{ .Name }}": x.{{ toPascalCase .Name }},
   {{ end }}
   }).ToExpr()
-{{ end }}
+{{ end -}}
 }

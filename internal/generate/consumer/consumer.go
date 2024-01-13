@@ -56,13 +56,6 @@ func GenerateResourceSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
 		return nil, err
 	}
 
-	attrs := resource.GetAttrs()
-	attrs.Name = resource.GetType() + "_attrs"
-	typesMap[attrs.Name] = attrs
-	if err := addTypes(typesMap, attrs); err != nil {
-		return nil, err
-	}
-
 	var names []string
 	for k := range typesMap {
 		names = append(names, k)

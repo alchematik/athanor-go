@@ -7,27 +7,16 @@ import (
 	sdk "github.com/alchematik/athanor-go/sdk/consumer"
 )
 
-type BucketObjectAttrs struct {
-}
-
-func (x BucketObjectAttrs) ToExpr() sdk.Expr {
-
-	return sdk.Map(map[string]sdk.Type{}).ToExpr()
-
-}
-
 type BucketObjectConfig struct {
 	Contents  sdk.Type
 	SomeField sdk.Type
 }
 
 func (x BucketObjectConfig) ToExpr() sdk.Expr {
-
 	return sdk.Map(map[string]sdk.Type{
 		"contents":   x.Contents,
 		"some_field": x.SomeField,
 	}).ToExpr()
-
 }
 
 type BucketObjectIdentifier struct {
@@ -38,7 +27,6 @@ type BucketObjectIdentifier struct {
 }
 
 func (x BucketObjectIdentifier) ToExpr() sdk.Expr {
-
 	return sdk.ResourceIdentifier(
 		"bucket_object",
 		x.Alias,
@@ -47,5 +35,4 @@ func (x BucketObjectIdentifier) ToExpr() sdk.Expr {
 			"name":   x.Name,
 		}),
 	).ToExpr()
-
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	// "fmt"
 	"log"
 
 	provider "github.com/alchematik/athanor-go/example/schema/output/consumer"
@@ -9,7 +8,6 @@ import (
 )
 
 func main() {
-	log.Printf("BUILDING BLUEPRINT\n")
 	p := sdk.Provider("gcp", sdk.String("gcp"), sdk.String("v0.0.1"))
 
 	bp := sdk.Blueprint{}
@@ -38,7 +36,6 @@ func main() {
 
 	bp = bp.WithResource(sdk.Resource(sdk.Bool(true), p, objectID, objectConfig))
 
-	// log.Printf(">>>>>>>>>> %+v\n", bp)
 	if err := sdk.Build(bp); err != nil {
 		log.Fatalf("error building blueprint: %v\n", err)
 	}
