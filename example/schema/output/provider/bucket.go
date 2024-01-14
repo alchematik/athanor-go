@@ -16,23 +16,23 @@ type Bucket struct {
 	Attrs      BucketAttrs
 }
 
-func (x Bucket) ToResourceValue() (sdk.ResourceValue, error) {
+func (x Bucket) ToResourceValue() (sdk.Resource, error) {
 	id, err := x.Identifier.ToValue()
 	if err != nil {
-		return sdk.ResourceValue{}, nil
+		return sdk.Resource{}, nil
 	}
 
 	config, err := x.Config.ToValue()
 	if err != nil {
-		return sdk.ResourceValue{}, nil
+		return sdk.Resource{}, nil
 	}
 
 	attrs, err := x.Attrs.ToValue()
 	if err != nil {
-		return sdk.ResourceValue{}, nil
+		return sdk.Resource{}, nil
 	}
 
-	return sdk.ResourceValue{
+	return sdk.Resource{
 		Identifier: id,
 		Config:     config,
 		Attrs:      attrs,
@@ -62,65 +62,65 @@ type BucketHandler struct {
 	BucketDeleter BucketDeleter
 }
 
-func (h BucketHandler) GetResource(ctx context.Context, id sdk.Identifier) (sdk.ResourceValue, error) {
+func (h BucketHandler) GetResource(ctx context.Context, id sdk.Identifier) (sdk.Resource, error) {
 	if h.BucketGetter == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
 	idVal, err := ParseBucketIdentifier(id.Value)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	r, err := h.BucketGetter.GetBucket(ctx, idVal)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	return r.ToResourceValue()
 }
 
-func (h BucketHandler) CreateResource(ctx context.Context, id sdk.Identifier, config sdk.Value) (sdk.ResourceValue, error) {
+func (h BucketHandler) CreateResource(ctx context.Context, id sdk.Identifier, config any) (sdk.Resource, error) {
 	if h.BucketCreator == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
 	idVal, err := ParseBucketIdentifier(id.Value)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	configVal, err := ParseBucketConfig(config)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	r, err := h.BucketCreator.CreateBucket(ctx, idVal, configVal)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	return r.ToResourceValue()
 }
 
-func (h BucketHandler) UpdateResource(ctx context.Context, id sdk.Identifier, config sdk.Value) (sdk.ResourceValue, error) {
+func (h BucketHandler) UpdateResource(ctx context.Context, id sdk.Identifier, config any) (sdk.Resource, error) {
 	if h.BucketUpdator == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
 	idVal, err := ParseBucketIdentifier(id.Value)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	configVal, err := ParseBucketConfig(config)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	r, err := h.BucketUpdator.UpdateBucket(ctx, idVal, configVal)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	return r.ToResourceValue()
@@ -143,26 +143,20 @@ type Bar struct {
 	Foo string
 }
 
-func (x Bar) ToValue() (sdk.Value, error) {
-	foo, err := sdk.ToValue(x.Foo)
-	if err != nil {
-		return nil, err
-	}
-
-	return sdk.Map{
-		"foo": foo,
+func (x Bar) ToValue() (any, error) {
+	return map[string]any{
+		"foo": x.Foo,
 	}, nil
-
 }
 
-func ParseBar(v sdk.Value) (Bar, error) {
+func ParseBar(v any) (Bar, error) {
 
-	m, err := sdk.ParseMap(v)
+	m, err := sdk.Map(v)
 	if err != nil {
 		return Bar{}, nil
 	}
 
-	foo, err := sdk.ParseStringValue(m["foo"])
+	foo, err := sdk.String(m["foo"])
 	if err != nil {
 		return Bar{}, nil
 	}
@@ -176,21 +170,15 @@ type BucketAttrs struct {
 	Bar Bar
 }
 
-func (x BucketAttrs) ToValue() (sdk.Value, error) {
-	bar, err := sdk.ToValue(x.Bar)
-	if err != nil {
-		return nil, err
-	}
-
-	return sdk.Map{
-		"bar": bar,
+func (x BucketAttrs) ToValue() (any, error) {
+	return map[string]any{
+		"bar": x.Bar,
 	}, nil
-
 }
 
-func ParseBucketAttrs(v sdk.Value) (BucketAttrs, error) {
+func ParseBucketAttrs(v any) (BucketAttrs, error) {
 
-	m, err := sdk.ParseMap(v)
+	m, err := sdk.Map(v)
 	if err != nil {
 		return BucketAttrs{}, nil
 	}
@@ -209,26 +197,20 @@ type BucketConfig struct {
 	Expiration string
 }
 
-func (x BucketConfig) ToValue() (sdk.Value, error) {
-	expiration, err := sdk.ToValue(x.Expiration)
-	if err != nil {
-		return nil, err
-	}
-
-	return sdk.Map{
-		"expiration": expiration,
+func (x BucketConfig) ToValue() (any, error) {
+	return map[string]any{
+		"expiration": x.Expiration,
 	}, nil
-
 }
 
-func ParseBucketConfig(v sdk.Value) (BucketConfig, error) {
+func ParseBucketConfig(v any) (BucketConfig, error) {
 
-	m, err := sdk.ParseMap(v)
+	m, err := sdk.Map(v)
 	if err != nil {
 		return BucketConfig{}, nil
 	}
 
-	expiration, err := sdk.ParseStringValue(m["expiration"])
+	expiration, err := sdk.String(m["expiration"])
 	if err != nil {
 		return BucketConfig{}, nil
 	}
@@ -244,51 +226,37 @@ type BucketIdentifier struct {
 	Name    string
 }
 
+func (x BucketIdentifier) ToValue() (any, error) {
+	return sdk.Identifier{
+		ResourceType: "bucket",
+		Value: map[string]any{
+			"account": x.Account,
+			"region":  x.Region,
+			"name":    x.Name,
+		},
+	}, nil
+}
+
 func (x BucketIdentifier) ResourceType() string {
 	return "bucket"
 }
 
-func (x BucketIdentifier) ToValue() (sdk.Value, error) {
-	account, err := sdk.ToValue(x.Account)
-	if err != nil {
-		return nil, err
-	}
-	region, err := sdk.ToValue(x.Region)
-	if err != nil {
-		return nil, err
-	}
-	name, err := sdk.ToValue(x.Name)
-	if err != nil {
-		return nil, err
-	}
+func ParseBucketIdentifier(v any) (BucketIdentifier, error) {
 
-	return sdk.Identifier{
-		ResourceType: x.ResourceType(),
-		Value: sdk.Map{
-			"account": account,
-			"region":  region,
-			"name":    name,
-		},
-	}, nil
-
-}
-
-func ParseBucketIdentifier(v sdk.Value) (BucketIdentifier, error) {
-
-	m, err := sdk.ParseMap(v)
+	m, err := sdk.Map(v)
 	if err != nil {
 		return BucketIdentifier{}, nil
 	}
 
-	account, err := sdk.ParseStringValue(m["account"])
+	account, err := sdk.String(m["account"])
 	if err != nil {
 		return BucketIdentifier{}, nil
 	}
-	region, err := sdk.ParseStringValue(m["region"])
+	region, err := sdk.String(m["region"])
 	if err != nil {
 		return BucketIdentifier{}, nil
 	}
-	name, err := sdk.ParseStringValue(m["name"])
+	name, err := sdk.String(m["name"])
 	if err != nil {
 		return BucketIdentifier{}, nil
 	}

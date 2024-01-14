@@ -16,23 +16,23 @@ type BucketObject struct {
 	Attrs      BucketObjectAttrs
 }
 
-func (x BucketObject) ToResourceValue() (sdk.ResourceValue, error) {
+func (x BucketObject) ToResourceValue() (sdk.Resource, error) {
 	id, err := x.Identifier.ToValue()
 	if err != nil {
-		return sdk.ResourceValue{}, nil
+		return sdk.Resource{}, nil
 	}
 
 	config, err := x.Config.ToValue()
 	if err != nil {
-		return sdk.ResourceValue{}, nil
+		return sdk.Resource{}, nil
 	}
 
 	attrs, err := x.Attrs.ToValue()
 	if err != nil {
-		return sdk.ResourceValue{}, nil
+		return sdk.Resource{}, nil
 	}
 
-	return sdk.ResourceValue{
+	return sdk.Resource{
 		Identifier: id,
 		Config:     config,
 		Attrs:      attrs,
@@ -62,65 +62,65 @@ type BucketObjectHandler struct {
 	BucketObjectDeleter BucketObjectDeleter
 }
 
-func (h BucketObjectHandler) GetResource(ctx context.Context, id sdk.Identifier) (sdk.ResourceValue, error) {
+func (h BucketObjectHandler) GetResource(ctx context.Context, id sdk.Identifier) (sdk.Resource, error) {
 	if h.BucketObjectGetter == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
 	idVal, err := ParseBucketObjectIdentifier(id.Value)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	r, err := h.BucketObjectGetter.GetBucketObject(ctx, idVal)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	return r.ToResourceValue()
 }
 
-func (h BucketObjectHandler) CreateResource(ctx context.Context, id sdk.Identifier, config sdk.Value) (sdk.ResourceValue, error) {
+func (h BucketObjectHandler) CreateResource(ctx context.Context, id sdk.Identifier, config any) (sdk.Resource, error) {
 	if h.BucketObjectCreator == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
 	idVal, err := ParseBucketObjectIdentifier(id.Value)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	configVal, err := ParseBucketObjectConfig(config)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	r, err := h.BucketObjectCreator.CreateBucketObject(ctx, idVal, configVal)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	return r.ToResourceValue()
 }
 
-func (h BucketObjectHandler) UpdateResource(ctx context.Context, id sdk.Identifier, config sdk.Value) (sdk.ResourceValue, error) {
+func (h BucketObjectHandler) UpdateResource(ctx context.Context, id sdk.Identifier, config any) (sdk.Resource, error) {
 	if h.BucketObjectUpdator == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
 	idVal, err := ParseBucketObjectIdentifier(id.Value)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	configVal, err := ParseBucketObjectConfig(config)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	r, err := h.BucketObjectUpdator.UpdateBucketObject(ctx, idVal, configVal)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	return r.ToResourceValue()
@@ -142,13 +142,11 @@ func (h BucketObjectHandler) DeleteResource(ctx context.Context, id sdk.Identifi
 type BucketObjectAttrs struct {
 }
 
-func (x BucketObjectAttrs) ToValue() (sdk.Value, error) {
-
-	return sdk.Map{}, nil
-
+func (x BucketObjectAttrs) ToValue() (any, error) {
+	return map[string]any{}, nil
 }
 
-func ParseBucketObjectAttrs(v sdk.Value) (BucketObjectAttrs, error) {
+func ParseBucketObjectAttrs(v any) (BucketObjectAttrs, error) {
 
 	return BucketObjectAttrs{}, nil
 }
@@ -158,35 +156,25 @@ type BucketObjectConfig struct {
 	SomeField string
 }
 
-func (x BucketObjectConfig) ToValue() (sdk.Value, error) {
-	contents, err := sdk.ToValue(x.Contents)
-	if err != nil {
-		return nil, err
-	}
-	some_field, err := sdk.ToValue(x.SomeField)
-	if err != nil {
-		return nil, err
-	}
-
-	return sdk.Map{
-		"contents":   contents,
-		"some_field": some_field,
+func (x BucketObjectConfig) ToValue() (any, error) {
+	return map[string]any{
+		"contents":   x.Contents,
+		"some_field": x.SomeField,
 	}, nil
-
 }
 
-func ParseBucketObjectConfig(v sdk.Value) (BucketObjectConfig, error) {
+func ParseBucketObjectConfig(v any) (BucketObjectConfig, error) {
 
-	m, err := sdk.ParseMap(v)
+	m, err := sdk.Map(v)
 	if err != nil {
 		return BucketObjectConfig{}, nil
 	}
 
-	contents, err := sdk.ParseStringValue(m["contents"])
+	contents, err := sdk.String(m["contents"])
 	if err != nil {
 		return BucketObjectConfig{}, nil
 	}
-	some_field, err := sdk.ParseStringValue(m["some_field"])
+	some_field, err := sdk.String(m["some_field"])
 	if err != nil {
 		return BucketObjectConfig{}, nil
 	}
@@ -202,33 +190,23 @@ type BucketObjectIdentifier struct {
 	Name   string
 }
 
+func (x BucketObjectIdentifier) ToValue() (any, error) {
+	return sdk.Identifier{
+		ResourceType: "bucket_object",
+		Value: map[string]any{
+			"bucket": x.Bucket,
+			"name":   x.Name,
+		},
+	}, nil
+}
+
 func (x BucketObjectIdentifier) ResourceType() string {
 	return "bucket_object"
 }
 
-func (x BucketObjectIdentifier) ToValue() (sdk.Value, error) {
-	bucket, err := sdk.ToValue(x.Bucket)
-	if err != nil {
-		return nil, err
-	}
-	name, err := sdk.ToValue(x.Name)
-	if err != nil {
-		return nil, err
-	}
+func ParseBucketObjectIdentifier(v any) (BucketObjectIdentifier, error) {
 
-	return sdk.Identifier{
-		ResourceType: x.ResourceType(),
-		Value: sdk.Map{
-			"bucket": bucket,
-			"name":   name,
-		},
-	}, nil
-
-}
-
-func ParseBucketObjectIdentifier(v sdk.Value) (BucketObjectIdentifier, error) {
-
-	m, err := sdk.ParseMap(v)
+	m, err := sdk.Map(v)
 	if err != nil {
 		return BucketObjectIdentifier{}, nil
 	}
@@ -237,7 +215,7 @@ func ParseBucketObjectIdentifier(v sdk.Value) (BucketObjectIdentifier, error) {
 	if err != nil {
 		return BucketObjectIdentifier{}, nil
 	}
-	name, err := sdk.ParseStringValue(m["name"])
+	name, err := sdk.String(m["name"])
 	if err != nil {
 		return BucketObjectIdentifier{}, nil
 	}

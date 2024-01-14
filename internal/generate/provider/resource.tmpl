@@ -16,23 +16,23 @@ type {{ .Type }} struct {
 	Attrs      {{ .Type }}Attrs
 }
 
-func (x {{ .Type }}) ToResourceValue() (sdk.ResourceValue, error) {
+func (x {{ .Type }}) ToResourceValue() (sdk.Resource, error) {
 	id, err := x.Identifier.ToValue()
 	if err != nil {
-		return sdk.ResourceValue{}, nil
+		return sdk.Resource{}, nil
 	}
 
 	config, err := x.Config.ToValue()
 	if err != nil {
-		return sdk.ResourceValue{}, nil
+		return sdk.Resource{}, nil
 	}
 
 	attrs, err := x.Attrs.ToValue()
 	if err != nil {
-		return sdk.ResourceValue{}, nil
+		return sdk.Resource{}, nil
 	}
 
-	return sdk.ResourceValue{
+	return sdk.Resource{
 		Identifier: id,
 		Config:     config,
 		Attrs:      attrs,
@@ -62,65 +62,65 @@ type {{ .Type }}Handler struct {
 	{{ .Type }}Deleter {{ .Type }}Deleter
 }
 
-func (h {{ .Type }}Handler) GetResource(ctx context.Context, id sdk.Identifier) (sdk.ResourceValue, error) {
+func (h {{ .Type }}Handler) GetResource(ctx context.Context, id sdk.Identifier) (sdk.Resource, error) {
 	if h.{{ .Type }}Getter == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
 	idVal, err := Parse{{ .Type }}Identifier(id.Value)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	r, err := h.{{ .Type }}Getter.Get{{ .Type }}(ctx, idVal)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	return r.ToResourceValue()
 }
 
-func (h {{ .Type }}Handler) CreateResource(ctx context.Context, id sdk.Identifier, config sdk.Value) (sdk.ResourceValue, error) {
+func (h {{ .Type }}Handler) CreateResource(ctx context.Context, id sdk.Identifier, config any) (sdk.Resource, error) {
 	if h.{{ .Type }}Creator == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
 	idVal, err := Parse{{ .Type }}Identifier(id.Value)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	configVal, err := Parse{{ .Type }}Config(config)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	r, err := h.{{ .Type }}Creator.Create{{ .Type }}(ctx, idVal, configVal)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	return r.ToResourceValue()
 }
 
-func (h {{ .Type }}Handler) UpdateResource(ctx context.Context, id sdk.Identifier, config sdk.Value) (sdk.ResourceValue, error) {
+func (h {{ .Type }}Handler) UpdateResource(ctx context.Context, id sdk.Identifier, config any) (sdk.Resource, error) {
 	if h.{{ .Type }}Updator == nil {
-		return sdk.ResourceValue{}, fmt.Errorf("unimplemented")
+		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
 	idVal, err := Parse{{ .Type }}Identifier(id.Value)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	configVal, err := Parse{{ .Type }}Config(config)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	r, err := h.{{ .Type }}Updator.Update{{ .Type }}(ctx, idVal, configVal)
 	if err != nil {
-		return sdk.ResourceValue{}, err
+		return sdk.Resource{}, err
 	}
 
 	return r.ToResourceValue()

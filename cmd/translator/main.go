@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,9 +63,7 @@ func (s *Server) TranslateProviderSchema(ctx context.Context, req *translatorpb.
 }
 
 func (s *Server) TranslateBlueprint(ctx context.Context, req *translatorpb.TranslateBlueprintRequest) (*translatorpb.TranslateBlueprintResponse, error) {
-	log.Printf("GETTING TRANSLATE BLUEPRINT %v\n", req.GetInputPath())
 	if err := exec.Command("go", "run", req.GetInputPath(), req.GetOutputPath()).Run(); err != nil {
-		log.Printf("ERROR WHILE TRANSLATING BLUEPRINT: %v\n", err.Error())
 		return &translatorpb.TranslateBlueprintResponse{}, status.Error(codes.Internal, err.Error())
 	}
 

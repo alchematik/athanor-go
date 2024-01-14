@@ -2,9 +2,9 @@ package sdk
 
 import (
 	"encoding/json"
-	// "fmt"
-	blueprintpb "github.com/alchematik/athanor-go/internal/gen/go/proto/blueprint/v1"
 	"os"
+
+	blueprintpb "github.com/alchematik/athanor-go/internal/gen/go/proto/blueprint/v1"
 )
 
 type Blueprint struct {

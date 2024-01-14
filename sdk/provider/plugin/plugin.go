@@ -46,9 +46,9 @@ func (p *plug) GRPCClient(_ context.Context, _ *hcplugin.GRPCBroker, conn *grpc.
 }
 
 type ResourceHandler interface {
-	GetResource(context.Context, value.Identifier) (value.ResourceValue, error)
-	CreateResource(context.Context, value.Identifier, value.Value) (value.ResourceValue, error)
-	UpdateResource(context.Context, value.Identifier, value.Value) (value.ResourceValue, error)
+	GetResource(context.Context, value.Identifier) (value.Resource, error)
+	CreateResource(context.Context, value.Identifier, value.Config) (value.Resource, error)
+	UpdateResource(context.Context, value.Identifier, value.Config) (value.Resource, error)
 	DeleteResource(context.Context, value.Identifier) error
 }
 
@@ -73,7 +73,12 @@ func (s *server) GetResource(ctx context.Context, req *providerpb.GetResourceReq
 		return &providerpb.GetResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	return &providerpb.GetResourceResponse{Resource: res.ToResourceProto()}, nil
+	p, err := res.ToResourceProto()
+	if err != nil {
+		return &providerpb.GetResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	return &providerpb.GetResourceResponse{Resource: p}, nil
 }
 
 func (s *server) CreateResource(ctx context.Context, req *providerpb.CreateResourceRequest) (*providerpb.CreateResourceResponse, error) {
@@ -93,12 +98,17 @@ func (s *server) CreateResource(ctx context.Context, req *providerpb.CreateResou
 		return &providerpb.CreateResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	res, err := handler.CreateResource(ctx, id, config)
+	res, err := handler.CreateResource(ctx, id, value.Config{Value: config})
 	if err != nil {
 		return &providerpb.CreateResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	return &providerpb.CreateResourceResponse{Resource: res.ToResourceProto()}, nil
+	p, err := res.ToResourceProto()
+	if err != nil {
+		return &providerpb.CreateResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	return &providerpb.CreateResourceResponse{Resource: p}, nil
 }
 
 func (s *server) UpdateResource(ctx context.Context, req *providerpb.UpdateResourceRequest) (*providerpb.UpdateResourceResponse, error) {
@@ -118,12 +128,17 @@ func (s *server) UpdateResource(ctx context.Context, req *providerpb.UpdateResou
 		return &providerpb.UpdateResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	res, err := handler.UpdateResource(ctx, id, config)
+	res, err := handler.UpdateResource(ctx, id, value.Config{Value: config})
 	if err != nil {
 		return &providerpb.UpdateResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	return &providerpb.UpdateResourceResponse{Resource: res.ToResourceProto()}, nil
+	p, err := res.ToResourceProto()
+	if err != nil {
+		return &providerpb.UpdateResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	return &providerpb.UpdateResourceResponse{Resource: p}, nil
 }
 
 func (s *server) DeleteResource(ctx context.Context, req *providerpb.DeleteResourceRequest) (*providerpb.DeleteResourceResponse, error) {

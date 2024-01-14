@@ -168,9 +168,11 @@ func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) 
 				}
 				switch f.GetType() {
 				case providerpb.FieldType_STRING:
-					return "sdk.ParseStringValue", nil
+					return "sdk.String", nil
 				case providerpb.FieldType_STRUCT:
 					return fmt.Sprintf("Parse%s", util.PascalCase(f.Name)), nil
+				case providerpb.FieldType_MAP:
+					return "sdk.Map", nil
 				default:
 					return "", fmt.Errorf("unsupported type %s", f.GetType())
 				}
@@ -185,6 +187,8 @@ func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) 
 					return "string", nil
 				case providerpb.FieldType_STRUCT:
 					return util.PascalCase(f.GetName()), nil
+				case providerpb.FieldType_MAP:
+					return "map[string]any", nil
 				default:
 					return "", fmt.Errorf("unrecognized type: %s", f.GetType())
 				}

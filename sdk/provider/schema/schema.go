@@ -8,6 +8,7 @@ const (
 	FieldTypeEmpty  FieldType = ""
 	FieldTypeString FieldType = "string"
 	FieldTypeStruct FieldType = "struct"
+	FieldTypeMap    FieldType = "map"
 )
 
 type Schema struct {
@@ -76,6 +77,8 @@ func (f FieldType) ToProto() providerpb.FieldType {
 		return providerpb.FieldType_STRING
 	case FieldTypeStruct:
 		return providerpb.FieldType_STRUCT
+	case FieldTypeMap:
+		return providerpb.FieldType_MAP
 	default:
 		return providerpb.FieldType_EMPTY
 	}

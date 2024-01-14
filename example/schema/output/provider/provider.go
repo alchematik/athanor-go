@@ -9,7 +9,7 @@ import (
 	sdk "github.com/alchematik/athanor-go/sdk/provider/value"
 )
 
-func ParseIdentifier(v sdk.Value) (sdk.ResourceIdentifier, error) {
+func ParseIdentifier(v any) (sdk.ResourceIdentifier, error) {
 	id, ok := v.(sdk.Identifier)
 	if !ok {
 		return nil, fmt.Errorf("expected Identifier type, got %T", v)

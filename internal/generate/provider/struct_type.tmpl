@@ -5,40 +5,33 @@ type {{ toPascalCase .Type.Name }} struct {
 }
 
 {{ if .Type.IsIdentifier }}
-func (x {{ toPascalCase .Type.Name }}) ResourceType() string {
-  return "{{ .ResourceName }}"
-}
-{{ end }}
-
-func (x {{ toPascalCase .Type.Name }}) ToValue() (sdk.Value, error) {
-{{ range .Type.Fields -}}
-  {{ .Name }}, err := sdk.ToValue(x.{{ toPascalCase .Name }})
-  if err != nil {
-    return nil, err
-  }
-{{ end }}
-
-{{ if .Type.IsIdentifier -}}
+func (x {{ toPascalCase .Type.Name }}) ToValue() (any, error) {
   return sdk.Identifier{
-    ResourceType: x.ResourceType(),
-    Value: sdk.Map{
+    ResourceType: "{{ .ResourceName }}",
+    Value: map[string]any{
   {{ range .Type.Fields -}}
-    "{{ .Name }}": {{ .Name }},
+    "{{ .Name }}": x.{{ toPascalCase .Name }},
   {{ end }}
     },
   }, nil
-{{ else -}}
-  return sdk.Map{
-  {{ range .Type.Fields -}}
-    "{{ .Name }}": {{ .Name }},
-  {{ end }}
-  }, nil
-{{ end }}
 }
 
-func Parse{{ toPascalCase .Type.Name }}(v sdk.Value) ({{ toPascalCase .Type.Name }}, error) {
+func (x {{ toPascalCase .Type.Name }}) ResourceType() string {
+  return "{{ .ResourceName }}"
+}
+{{ else }}
+func (x {{ toPascalCase .Type.Name }}) ToValue() (any, error) {
+  return map[string]any{
+  {{ range .Type.Fields -}}
+    "{{ .Name }}": x.{{ toPascalCase .Name }},
+  {{ end }}
+  }, nil
+}
+{{ end }}
+
+func Parse{{ toPascalCase .Type.Name }}(v any) ({{ toPascalCase .Type.Name }}, error) {
   {{ $length := len .Type.Fields }} {{ if gt $length 0 }}
-  m, err := sdk.ParseMap(v)
+  m, err := sdk.Map(v)
   if err != nil {
     return {{ toPascalCase .Type.Name }}{}, nil
   }

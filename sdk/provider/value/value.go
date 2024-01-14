@@ -5,22 +5,50 @@ import (
 	providerpb "github.com/alchematik/athanor-go/internal/gen/go/proto/provider/v1"
 )
 
-type ResourceField interface {
-	ToValue() (Value, error)
-}
-
 type ResourceIdentifier interface {
-	ResourceField
-
 	ResourceType() string
 }
 
-type Resource interface {
-	ToResourceValue() ResourceValue
+func Map(val any) (map[string]any, error) {
+	m, ok := val.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("expected map, got %T", val)
+	}
+
+	return m, nil
 }
 
-type Value interface {
-	ToValueProto() *providerpb.Value
+func String(val any) (string, error) {
+	s, ok := val.(string)
+	if !ok {
+		return "", fmt.Errorf("expected string, got %T", val)
+	}
+
+	return s, nil
+}
+
+func ParseProto(val *providerpb.Value) (any, error) {
+	switch v := val.GetType().(type) {
+	case *providerpb.Value_StringValue:
+		return v.StringValue, nil
+	case *providerpb.Value_BoolValue:
+		return v.BoolValue, nil
+	case *providerpb.Value_Map:
+		m := map[string]any{}
+		for k, v := range v.Map.GetEntries() {
+			var err error
+			m[k], err = ParseProto(v)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return m, nil
+	case *providerpb.Value_Identifier:
+		return ParseIdentifierProto(v.Identifier)
+	default:
+		return nil, fmt.Errorf("unhandled proto type: %T", v)
+	}
 }
 
 func ParseIdentifierProto(id *providerpb.Identifier) (Identifier, error) {
@@ -35,127 +63,91 @@ func ParseIdentifierProto(id *providerpb.Identifier) (Identifier, error) {
 	}, nil
 }
 
-func ParseProto(val *providerpb.Value) (Value, error) {
-	switch v := val.GetType().(type) {
-	case *providerpb.Value_StringValue:
-		return String(v.StringValue), nil
-	case *providerpb.Value_Map:
-		m := Map{}
-		for k, v := range v.Map.GetEntries() {
-			var err error
-			m[k], err = ParseProto(v)
+type Identifier struct {
+	ResourceType string
+	Value        any
+}
+
+type ResourceType interface {
+	ToValue() any
+}
+
+type Resource struct {
+	Identifier any
+	Config     any
+	Attrs      any
+}
+
+func (r Resource) ToResourceProto() (*providerpb.Resource, error) {
+	id, err := ToValueProto(r.Identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := ToValueProto(r.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	attrs, err := ToValueProto(r.Attrs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &providerpb.Resource{
+		Identifier: id,
+		Config:     config,
+		Attrs:      attrs,
+	}, nil
+}
+
+func ToValueProto(val any) (*providerpb.Value, error) {
+	switch v := val.(type) {
+	case string:
+		return &providerpb.Value{
+			Type: &providerpb.Value_StringValue{
+				StringValue: string(v),
+			},
+		}, nil
+	case bool:
+		return &providerpb.Value{
+			Type: &providerpb.Value_BoolValue{
+				BoolValue: bool(v),
+			},
+		}, nil
+	case map[string]any:
+		p := map[string]*providerpb.Value{}
+		for k, value := range v {
+			converted, err := ToValueProto(value)
 			if err != nil {
 				return nil, err
 			}
+			p[k] = converted
 		}
-		return m, nil
-	case *providerpb.Value_Identifier:
-		return ParseIdentifierProto(v.Identifier)
-	default:
-		return nil, fmt.Errorf("unhandled proto type: %T", v)
-	}
-}
 
-func ToValue(val any) (Value, error) {
-	switch v := val.(type) {
-	case string:
-		return String(v), nil
-	case bool:
-		return Bool(v), nil
-	case ResourceIdentifier:
-		return v.ToValue()
-	case ResourceField:
-		return v.ToValue()
-	default:
-		return nil, fmt.Errorf("cannot convert type %T to Value", val)
-	}
-}
-
-type Bool bool
-
-func (b Bool) ToValueProto() *providerpb.Value {
-	return &providerpb.Value{
-		Type: &providerpb.Value_BoolValue{
-			BoolValue: bool(b),
-		},
-	}
-}
-
-func ToStringValue(str string) String {
-	return String(str)
-}
-
-func ParseStringValue(val Value) (string, error) {
-	s, ok := val.(String)
-	if !ok {
-		return "", fmt.Errorf("not a string")
-	}
-
-	return string(s), nil
-}
-
-type String string
-
-func (s String) ToValueProto() *providerpb.Value {
-	return &providerpb.Value{
-		Type: &providerpb.Value_StringValue{
-			StringValue: string(s),
-		},
-	}
-}
-
-func ParseMap(val Value) (map[string]Value, error) {
-	m, ok := val.(Map)
-	if !ok {
-		return nil, fmt.Errorf("not a map")
-	}
-
-	return map[string]Value(m), nil
-}
-
-type Map map[string]Value
-
-func (m Map) ToValueProto() *providerpb.Value {
-	p := map[string]*providerpb.Value{}
-	for k, v := range m {
-		p[k] = v.ToValueProto()
-	}
-
-	return &providerpb.Value{
-		Type: &providerpb.Value_Map{
-			Map: &providerpb.MapValue{
-				Entries: p,
+		return &providerpb.Value{
+			Type: &providerpb.Value_Map{
+				Map: &providerpb.MapValue{
+					Entries: p,
+				},
 			},
-		},
-	}
-}
-
-type Identifier struct {
-	ResourceType string
-	Value        Value
-}
-
-func (id Identifier) ToValueProto() *providerpb.Value {
-	return &providerpb.Value{
-		Type: &providerpb.Value_Identifier{
-			Identifier: &providerpb.Identifier{
-				Type:  id.ResourceType,
-				Value: id.Value.ToValueProto(),
+		}, nil
+	case Identifier:
+		converted, err := ToValueProto(v)
+		if err != nil {
+			return nil, err
+		}
+		return &providerpb.Value{
+			Type: &providerpb.Value_Identifier{
+				Identifier: &providerpb.Identifier{
+					Type:  v.ResourceType,
+					Value: converted,
+				},
 			},
-		},
-	}
-}
-
-type ResourceValue struct {
-	Identifier Value
-	Config     Value
-	Attrs      Value
-}
-
-func (r ResourceValue) ToResourceProto() *providerpb.Resource {
-	return &providerpb.Resource{
-		Identifier: r.Identifier.ToValueProto(),
-		Config:     r.Config.ToValueProto(),
-		Attrs:      r.Attrs.ToValueProto(),
+		}, nil
+	case ResourceType:
+		return ToValueProto(v.ToValue())
+	default:
+		return nil, fmt.Errorf("invalid type: %T", v)
 	}
 }
