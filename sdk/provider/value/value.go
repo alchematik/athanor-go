@@ -133,7 +133,7 @@ func ToValueProto(val any) (*providerpb.Value, error) {
 			},
 		}, nil
 	case Identifier:
-		converted, err := ToValueProto(v)
+		converted, err := ToValueProto(v.Value)
 		if err != nil {
 			return nil, err
 		}

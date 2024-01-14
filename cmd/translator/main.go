@@ -149,7 +149,7 @@ func (s *Server) GenerateConsumerSDK(ctx context.Context, req *translatorpb.Gene
 			return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
 		}
 
-		src, err := consumer.GenerateResourceSrc(resource)
+		src, err := consumer.GenerateResourceSrc(&schema, resource)
 		if err != nil {
 			return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
 		}

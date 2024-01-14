@@ -19,7 +19,7 @@ var resourceTmpl string
 //go:embed struct_type.tmpl
 var structTypeTmpl string
 
-func GenerateResourceSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
+func GenerateResourceSrc(schema *providerpb.Schema, resource *providerpb.ResourceSchema) ([]byte, error) {
 	tmpl, err := template.New("resource").
 		Funcs(template.FuncMap{
 			"toPascalCase": util.PascalCase,
@@ -30,7 +30,7 @@ func GenerateResourceSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
 	}
 
 	data := map[string]any{
-		"PackageName": "provider",
+		"PackageName": schema.Name,
 	}
 
 	var buf bytes.Buffer
