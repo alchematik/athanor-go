@@ -2,8 +2,10 @@ package plugin
 
 import (
 	"context"
+	"errors"
 
 	providerpb "github.com/alchematik/athanor-go/internal/gen/go/proto/provider/v1"
+	sdkerrors "github.com/alchematik/athanor-go/sdk/errors"
 	"github.com/alchematik/athanor-go/sdk/provider/value"
 
 	hcplugin "github.com/hashicorp/go-plugin"
@@ -47,8 +49,8 @@ func (p *plug) GRPCClient(_ context.Context, _ *hcplugin.GRPCBroker, conn *grpc.
 
 type ResourceHandler interface {
 	GetResource(context.Context, value.Identifier) (value.Resource, error)
-	CreateResource(context.Context, value.Identifier, value.Config) (value.Resource, error)
-	UpdateResource(context.Context, value.Identifier, value.Config) (value.Resource, error)
+	CreateResource(context.Context, value.Identifier, any) (value.Resource, error)
+	UpdateResource(context.Context, value.Identifier, any) (value.Resource, error)
 	DeleteResource(context.Context, value.Identifier) error
 }
 
@@ -70,6 +72,11 @@ func (s *server) GetResource(ctx context.Context, req *providerpb.GetResourceReq
 
 	res, err := handler.GetResource(ctx, id)
 	if err != nil {
+		var notFound sdkerrors.ErrorNotFound
+		if errors.As(err, &notFound) {
+			return &providerpb.GetResourceResponse{}, status.Error(codes.NotFound, err.Error())
+		}
+
 		return &providerpb.GetResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
@@ -98,7 +105,7 @@ func (s *server) CreateResource(ctx context.Context, req *providerpb.CreateResou
 		return &providerpb.CreateResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	res, err := handler.CreateResource(ctx, id, value.Config{Value: config})
+	res, err := handler.CreateResource(ctx, id, config)
 	if err != nil {
 		return &providerpb.CreateResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
@@ -128,7 +135,7 @@ func (s *server) UpdateResource(ctx context.Context, req *providerpb.UpdateResou
 		return &providerpb.UpdateResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	res, err := handler.UpdateResource(ctx, id, value.Config{Value: config})
+	res, err := handler.UpdateResource(ctx, id, config)
 	if err != nil {
 		return &providerpb.UpdateResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
