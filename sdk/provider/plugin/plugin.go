@@ -50,7 +50,7 @@ func (p *plug) GRPCClient(_ context.Context, _ *hcplugin.GRPCBroker, conn *grpc.
 type ResourceHandler interface {
 	GetResource(context.Context, value.Identifier) (value.Resource, error)
 	CreateResource(context.Context, value.Identifier, any) (value.Resource, error)
-	UpdateResource(context.Context, value.Identifier, any) (value.Resource, error)
+	UpdateResource(context.Context, value.Identifier, any, []value.UpdateMaskField) (value.Resource, error)
 	DeleteResource(context.Context, value.Identifier) error
 }
 
@@ -135,7 +135,13 @@ func (s *server) UpdateResource(ctx context.Context, req *providerpb.UpdateResou
 		return &providerpb.UpdateResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	res, err := handler.UpdateResource(ctx, id, config)
+	protoMask := req.GetMask()
+	mask := make([]value.UpdateMaskField, len(protoMask))
+	for i := range protoMask {
+		mask[i] = parseUpdateMaskFieldProto(protoMask[i])
+	}
+
+	res, err := handler.UpdateResource(ctx, id, config, mask)
 	if err != nil {
 		return &providerpb.UpdateResourceResponse{}, status.Error(codes.Internal, err.Error())
 	}
@@ -146,6 +152,24 @@ func (s *server) UpdateResource(ctx context.Context, req *providerpb.UpdateResou
 	}
 
 	return &providerpb.UpdateResourceResponse{Resource: p}, nil
+}
+
+func parseUpdateMaskFieldProto(field *providerpb.Field) value.UpdateMaskField {
+	op := value.OperationUpdate
+	if field.GetOperation() == providerpb.Operation_OPERATION_DELETE {
+		op = value.OperationDelete
+	}
+
+	sub := make([]value.UpdateMaskField, len(field.GetSubFields()))
+	for i := range field.GetSubFields() {
+		sub[i] = parseUpdateMaskFieldProto(field.GetSubFields()[i])
+	}
+
+	return value.UpdateMaskField{
+		Name:      field.GetName(),
+		Operation: op,
+		SubFields: sub,
+	}
 }
 
 func (s *server) DeleteResource(ctx context.Context, req *providerpb.DeleteResourceRequest) (*providerpb.DeleteResourceResponse, error) {

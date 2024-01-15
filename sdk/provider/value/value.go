@@ -68,6 +68,19 @@ type Identifier struct {
 	Value        any
 }
 
+type UpdateMaskField struct {
+	Name      string
+	SubFields []UpdateMaskField
+	Operation Operation
+}
+
+type Operation string
+
+const (
+	OperationUpdate Operation = "update"
+	OperationDelete Operation = "delete"
+)
+
 type ResourceType interface {
 	ToValue() any
 }
