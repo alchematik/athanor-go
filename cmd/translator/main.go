@@ -81,16 +81,21 @@ func (s *Server) GenerateProviderSDK(ctx context.Context, req *translatorpb.Gene
 		return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	if err := os.MkdirAll(req.GetOutputPath(), 0777); err != nil {
+	if err := os.MkdirAll(filepath.Join(req.GetOutputPath(), "provider"), 0777); err != nil {
 		return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	providerFile, err := os.Create(filepath.Join(req.GetOutputPath(), "provider.go"))
+	providerFile, err := os.Create(filepath.Join(req.GetOutputPath(), "provider", "provider.go"))
 	if err != nil {
 		return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	commonSrc, err := provider.GenerateProviderCommonSrc(&schema)
+	mod := req.GetArgs()["module"]
+	if mod == "" {
+		return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, "missing module")
+	}
+
+	commonSrc, err := provider.GenerateProviderCommonSrc(mod, req.GetOutputPath(), &schema)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +110,11 @@ func (s *Server) GenerateProviderSDK(ctx context.Context, req *translatorpb.Gene
 	})
 
 	for _, resource := range resources {
-		f, err := os.Create(filepath.Join(req.GetOutputPath(), resource.GetType()+".go"))
+		if err := os.MkdirAll(filepath.Join(req.GetOutputPath(), resource.GetType()), 0777); err != nil {
+			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
+		}
+
+		f, err := os.Create(filepath.Join(req.GetOutputPath(), resource.GetType(), resource.GetType()+".go"))
 		if err != nil {
 			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 		}

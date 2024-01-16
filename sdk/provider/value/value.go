@@ -27,6 +27,24 @@ func String(val any) (string, error) {
 	return s, nil
 }
 
+func ParseIdentifier(val any) (Identifier, error) {
+	id, ok := val.(Identifier)
+	if !ok {
+		return Identifier{}, fmt.Errorf("expected Identifier, got %T", val)
+	}
+
+	return id, nil
+}
+
+func ParseFile(val any) (File, error) {
+	f, ok := val.(File)
+	if !ok {
+		return File{}, fmt.Errorf("expected File, got %T", val)
+	}
+
+	return f, nil
+}
+
 func ParseProto(val *providerpb.Value) (any, error) {
 	switch v := val.GetType().(type) {
 	case *providerpb.Value_StringValue:
@@ -46,6 +64,11 @@ func ParseProto(val *providerpb.Value) (any, error) {
 		return m, nil
 	case *providerpb.Value_Identifier:
 		return ParseIdentifierProto(v.Identifier)
+	case *providerpb.Value_File:
+		return File{
+			Path:     v.File.Path,
+			Checksum: v.File.Checksum,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unhandled proto type: %T", v)
 	}
@@ -72,6 +95,11 @@ type UpdateMaskField struct {
 	Name      string
 	SubFields []UpdateMaskField
 	Operation Operation
+}
+
+type File struct {
+	Path     string
+	Checksum string
 }
 
 type Operation string
@@ -160,6 +188,15 @@ func ToValueProto(val any) (*providerpb.Value, error) {
 		}, nil
 	case ResourceType:
 		return ToValueProto(v.ToValue())
+	case File:
+		return &providerpb.Value{
+			Type: &providerpb.Value_File{
+				File: &providerpb.FileValue{
+					Path:     v.Path,
+					Checksum: v.Checksum,
+				},
+			},
+		}, nil
 	default:
 		return nil, fmt.Errorf("invalid type: %T", v)
 	}

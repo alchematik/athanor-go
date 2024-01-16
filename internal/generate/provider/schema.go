@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"go/format"
+	"path/filepath"
 	"sort"
 	"text/template"
 
@@ -21,7 +22,7 @@ var structTypeTmpl string
 //go:embed provider.tmpl
 var providerTmpl string
 
-func GenerateProviderCommonSrc(schema *providerpb.Schema) ([]byte, error) {
+func GenerateProviderCommonSrc(module string, outputPath string, schema *providerpb.Schema) ([]byte, error) {
 	resources := schema.GetResources()
 	sort.Slice(resources, func(i, j int) bool {
 		return resources[i].GetType() < resources[j].GetType()
@@ -42,8 +43,9 @@ func GenerateProviderCommonSrc(schema *providerpb.Schema) ([]byte, error) {
 	}
 
 	providerData := map[string]any{
-		"PackageName": "provider",
-		"Types":       resourceNames,
+		"PackageName":  "provider",
+		"Types":        resourceNames,
+		"ImportPrefix": filepath.Join(module, outputPath),
 	}
 
 	var buf bytes.Buffer
@@ -72,7 +74,7 @@ func GenerateResourceSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
 	}
 
 	data := map[string]any{
-		"PackageName": "provider",
+		"PackageName": name,
 		"Type":        util.PascalCase(name),
 	}
 
@@ -173,6 +175,10 @@ func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) 
 					return fmt.Sprintf("Parse%s", util.PascalCase(f.Name)), nil
 				case providerpb.FieldType_MAP:
 					return "sdk.Map", nil
+				case providerpb.FieldType_FILE:
+					return "sdk.ParseFile", nil
+				case providerpb.FieldType_IDENTIFIER:
+					return "sdk.ParseIdentifier", nil
 				default:
 					return "", fmt.Errorf("unsupported type %s", f.GetType())
 				}
@@ -189,6 +195,10 @@ func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) 
 					return util.PascalCase(f.GetName()), nil
 				case providerpb.FieldType_MAP:
 					return "map[string]any", nil
+				case providerpb.FieldType_FILE:
+					return "sdk.File", nil
+				case providerpb.FieldType_IDENTIFIER:
+					return "sdk.Identifier", nil
 				default:
 					return "", fmt.Errorf("unrecognized type: %s", f.GetType())
 				}

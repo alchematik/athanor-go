@@ -90,6 +90,18 @@ func (m MapType) ToExpr() Expr {
 	return ex
 }
 
+func File(path string) FileType {
+	return FileType{Path: path}
+}
+
+type FileType struct {
+	Path string
+}
+
+func (f FileType) ToExpr() Expr {
+	return FileExpr{Path: f.Path}
+}
+
 func ResourceIdentifier(resourceType, alias string, value Type) ResourceIdentifierType {
 	return ResourceIdentifierType{
 		ResourceType: resourceType,
@@ -390,6 +402,20 @@ func (g IOGetExpr) ToExprProto() *blueprintpb.Expr {
 			IoGet: &blueprintpb.IOGetExpr{
 				Name:   g.Name,
 				Object: g.Object.ToExprProto(),
+			},
+		},
+	}
+}
+
+type FileExpr struct {
+	Path string
+}
+
+func (f FileExpr) ToExprProto() *blueprintpb.Expr {
+	return &blueprintpb.Expr{
+		Type: &blueprintpb.Expr_File{
+			File: &blueprintpb.FileExpr{
+				Path: f.Path,
 			},
 		},
 	}

@@ -29,20 +29,21 @@ func (x {{ toPascalCase .Type.Name }}) ToValue() (any, error) {
 }
 {{ end }}
 
-func Parse{{ toPascalCase .Type.Name }}(v any) ({{ toPascalCase .Type.Name }}, error) {
+{{ if .Type.IsIdentifier }}
+func Parse{{ toPascalCase .Type.Name }}(v sdk.Identifier) ({{ toPascalCase .Type.Name }}, error) {
   {{ $length := len .Type.Fields }} {{ if gt $length 0 }}
-  m, err := sdk.Map(v)
+  m, err := sdk.Map(v.Value)
   if err != nil {
     return {{ toPascalCase .Type.Name }}{}, nil
   }
-{{ end }}
+  {{ end }}
 
-{{ range .Type.Fields -}}
+  {{ range .Type.Fields -}}
   {{ .Name }}, err := {{ parseFieldFunc . }}(m["{{ .Name }}"])
   if err != nil {
     return {{ toPascalCase $.Type.Name }}{}, nil
   }
-{{ end }}
+  {{ end }}
 
   return {{ toPascalCase .Type.Name }}{
   {{ range .Type.Fields -}}
@@ -50,3 +51,26 @@ func Parse{{ toPascalCase .Type.Name }}(v any) ({{ toPascalCase .Type.Name }}, e
   {{ end }}
   }, nil
 }
+{{ else }}
+func Parse{{ toPascalCase .Type.Name }}(v any) ({{ toPascalCase .Type.Name }}, error) {
+  {{ $length := len .Type.Fields }} {{ if gt $length 0 }}
+  m, err := sdk.Map(v)
+  if err != nil {
+    return {{ toPascalCase .Type.Name }}{}, nil
+  }
+  {{ end }}
+
+  {{ range .Type.Fields -}}
+  {{ .Name }}, err := {{ parseFieldFunc . }}(m["{{ .Name }}"])
+  if err != nil {
+    return {{ toPascalCase $.Type.Name }}{}, nil
+  }
+  {{ end }}
+
+  return {{ toPascalCase .Type.Name }}{
+  {{ range .Type.Fields -}}
+    {{ toPascalCase .Name }}: {{ .Name }},
+  {{ end }}
+  }, nil
+}
+{{ end }}

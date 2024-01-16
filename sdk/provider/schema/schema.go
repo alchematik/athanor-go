@@ -5,10 +5,12 @@ import (
 )
 
 const (
-	FieldTypeEmpty  FieldType = ""
-	FieldTypeString FieldType = "string"
-	FieldTypeStruct FieldType = "struct"
-	FieldTypeMap    FieldType = "map"
+	FieldTypeEmpty      FieldType = ""
+	FieldTypeString     FieldType = "string"
+	FieldTypeStruct     FieldType = "struct"
+	FieldTypeMap        FieldType = "map"
+	FieldTypeFile       FieldType = "file"
+	FieldTypeIdentifier FieldType = "identifier"
 )
 
 type Schema struct {
@@ -79,6 +81,10 @@ func (f FieldType) ToProto() providerpb.FieldType {
 		return providerpb.FieldType_STRUCT
 	case FieldTypeMap:
 		return providerpb.FieldType_MAP
+	case FieldTypeFile:
+		return providerpb.FieldType_FILE
+	case FieldTypeIdentifier:
+		return providerpb.FieldType_IDENTIFIER
 	default:
 		return providerpb.FieldType_EMPTY
 	}

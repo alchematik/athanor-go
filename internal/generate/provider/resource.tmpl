@@ -67,7 +67,7 @@ func (h {{ .Type }}Handler) GetResource(ctx context.Context, id sdk.Identifier) 
 		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
-	idVal, err := Parse{{ .Type }}Identifier(id.Value)
+	idVal, err := Parse{{ .Type }}Identifier(id)
 	if err != nil {
 		return sdk.Resource{}, err
 	}
@@ -85,7 +85,7 @@ func (h {{ .Type }}Handler) CreateResource(ctx context.Context, id sdk.Identifie
 		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
-	idVal, err := Parse{{ .Type }}Identifier(id.Value)
+	idVal, err := Parse{{ .Type }}Identifier(id)
 	if err != nil {
 		return sdk.Resource{}, err
 	}
@@ -108,7 +108,7 @@ func (h {{ .Type }}Handler) UpdateResource(ctx context.Context, id sdk.Identifie
 		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
-	idVal, err := Parse{{ .Type }}Identifier(id.Value)
+	idVal, err := Parse{{ .Type }}Identifier(id)
 	if err != nil {
 		return sdk.Resource{}, err
 	}
@@ -131,7 +131,7 @@ func (h {{ .Type }}Handler) DeleteResource(ctx context.Context, id sdk.Identifie
 		return fmt.Errorf("unimplemented")
 	}
 
-	idVal, err := Parse{{ .Type }}Identifier(id.Value)
+	idVal, err := Parse{{ .Type }}Identifier(id)
 	if err != nil {
 		return err
 	}
