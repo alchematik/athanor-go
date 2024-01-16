@@ -3,26 +3,26 @@ type {{ toPascalCase .Type.Name }} struct {
   Alias string
 {{ end }}
 {{ range .Type.Fields -}}
-  {{ toPascalCase .Name }} sdk.Type
+  {{ toPascalCase .Name }} any
 {{ end }}
 }
 
-func (x {{ toPascalCase .Type.Name }}) ToExpr() sdk.Expr {
+func (x {{ toPascalCase .Type.Name }}) ToExpr() any {
 {{ if .Type.IsIdentifier -}}
   return sdk.ResourceIdentifier(
     "{{ .ResourceName }}",
     x.Alias,
-    sdk.Map(map[string]sdk.Type{
+    map[string]any{
   {{ range .Type.Fields -}}
     "{{ .Name }}": x.{{ toPascalCase .Name }},
   {{ end }}
-    }),
-  ).ToExpr()
+    },
+  )
 {{ else -}}
-  return sdk.Map(map[string]sdk.Type{
+  return map[string]any{
   {{ range .Type.Fields -}}
     "{{ .Name }}": x.{{ toPascalCase .Name }},
   {{ end }}
-  }).ToExpr()
+  }
 {{ end -}}
 }

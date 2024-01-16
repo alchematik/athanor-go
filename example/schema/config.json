@@ -14,5 +14,8 @@
       }
     }
   ],
-  "translators_dir": "./build"
+  "translators_dir": "./build",
+  "args": {
+    "module": "github.com/alchematik/athanor-go"
+  }
 }
