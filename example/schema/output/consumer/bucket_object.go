@@ -27,12 +27,12 @@ type BucketObjectIdentifier struct {
 }
 
 func (x BucketObjectIdentifier) ToExpr() any {
-	return sdk.ResourceIdentifier(
-		"bucket_object",
-		x.Alias,
-		map[string]any{
+	return sdk.ResourceIdentifier{
+		ResourceType: "bucket_object",
+		Alias:        x.Alias,
+		Value: map[string]any{
 			"bucket": x.Bucket,
 			"name":   x.Name,
 		},
-	)
+	}
 }

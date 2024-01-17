@@ -9,15 +9,15 @@ type {{ toPascalCase .Type.Name }} struct {
 
 func (x {{ toPascalCase .Type.Name }}) ToExpr() any {
 {{ if .Type.IsIdentifier -}}
-  return sdk.ResourceIdentifier(
-    "{{ .ResourceName }}",
-    x.Alias,
-    map[string]any{
+  return sdk.ResourceIdentifier{
+    ResourceType: "{{ .ResourceName }}",
+    Alias: x.Alias,
+    Value: map[string]any{
   {{ range .Type.Fields -}}
     "{{ .Name }}": x.{{ toPascalCase .Name }},
   {{ end }}
     },
-  )
+  }
 {{ else -}}
   return map[string]any{
   {{ range .Type.Fields -}}

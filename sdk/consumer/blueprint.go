@@ -23,68 +23,43 @@ type resourceStmt struct {
 	resource any
 }
 
-type FileType struct {
+type File struct {
 	Path string
 }
 
-func ResourceIdentifier(resourceType, alias string, value any) ResourceIdentifierType {
-	return ResourceIdentifierType{
-		ResourceType: resourceType,
-		Alias:        alias,
-		Value:        value,
-	}
-}
-
-type ResourceIdentifierType struct {
+type ResourceIdentifier struct {
 	Alias        string
 	ResourceType string
 	Value        any
 }
 
-func Resource(exists, provider, identifier, config any) ResourceType {
-	return ResourceType{
-		Exists:     exists,
-		Provider:   provider,
-		Identifier: identifier,
-		Config:     config,
-	}
-}
-
-type ResourceType struct {
+type Resource struct {
 	Exists     any
 	Provider   any
 	Identifier any
 	Config     any
 }
 
-func Provider(name, version string) ProviderType {
-	return ProviderType{
-		Name:    name,
-		Version: version,
-	}
-}
-
-type ProviderType struct {
+type Provider struct {
 	Name    string
 	Version string
 }
 
-func IOGet(name string, object any) IOGetType {
-	return IOGetType{
-		Name:   name,
-		Object: object,
-	}
-}
-
-type IOGetType struct {
+type Get struct {
 	Name   string
 	Object any
 }
 
-func (g IOGetType) IOGet(name string) IOGetType {
-	return IOGetType{
+func (g Get) Get(name string) Get {
+	return Get{
 		Name:   name,
 		Object: g,
+	}
+}
+
+func GetResource(alias string) Get {
+	return Get{
+		Name: alias,
 	}
 }
 
@@ -162,7 +137,7 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 				},
 			},
 		}, nil
-	case FileType:
+	case File:
 		return &blueprintpb.Expr{
 			Type: &blueprintpb.Expr_File{
 				File: &blueprintpb.FileExpr{
@@ -170,7 +145,7 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 				},
 			},
 		}, nil
-	case ResourceIdentifierType:
+	case ResourceIdentifier:
 		val, err := toExprProto(e.Value)
 		if err != nil {
 			return nil, err
@@ -184,7 +159,7 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 				},
 			},
 		}, nil
-	case ResourceType:
+	case Resource:
 		provider, err := toExprProto(e.Provider)
 		if err != nil {
 			return nil, err
@@ -215,7 +190,7 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 				},
 			},
 		}, nil
-	case ProviderType:
+	case Provider:
 		return &blueprintpb.Expr{
 			Type: &blueprintpb.Expr_Provider{
 				Provider: &blueprintpb.ProviderExpr{
@@ -224,14 +199,14 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 				},
 			},
 		}, nil
-	case IOGetType:
+	case Get:
 		obj, err := toExprProto(e.Object)
 		if err != nil {
 			return nil, err
 		}
 		return &blueprintpb.Expr{
-			Type: &blueprintpb.Expr_IoGet{
-				IoGet: &blueprintpb.IOGetExpr{
+			Type: &blueprintpb.Expr_Get{
+				Get: &blueprintpb.GetExpr{
 					Name:   e.Name,
 					Object: obj,
 				},
