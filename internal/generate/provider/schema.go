@@ -22,6 +22,9 @@ var structTypeTmpl string
 //go:embed provider.tmpl
 var providerTmpl string
 
+//go:embed identifier.tmpl
+var identifierTmpl string
+
 func GenerateProviderCommonSrc(module string, outputPath string, schema *providerpb.Schema) ([]byte, error) {
 	resources := schema.GetResources()
 	sort.Slice(resources, func(i, j int) bool {
@@ -43,7 +46,7 @@ func GenerateProviderCommonSrc(module string, outputPath string, schema *provide
 	}
 
 	providerData := map[string]any{
-		"PackageName":  "provider",
+		"PackageName":  "identifier",
 		"Types":        resourceNames,
 		"ImportPrefix": filepath.Join(module, outputPath),
 	}
@@ -61,21 +64,18 @@ func GenerateProviderCommonSrc(module string, outputPath string, schema *provide
 	return src, nil
 }
 
-func GenerateResourceSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
-	name := resource.GetType()
-
-	tmpl, err := template.New("resource").
+func GenerateIdentifierSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
+	tmpl, err := template.New("identifier").
 		Funcs(template.FuncMap{
 			"toPascalCase": util.PascalCase,
 		}).
-		Parse(resourceTmpl)
+		Parse(identifierTmpl)
 	if err != nil {
 		return nil, err
 	}
 
 	data := map[string]any{
-		"PackageName": name,
-		"Type":        util.PascalCase(name),
+		"PackageName": "identifier",
 	}
 
 	var buf bytes.Buffer
@@ -93,6 +93,77 @@ func GenerateResourceSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
 	if err := addTypes(typesMap, id); err != nil {
 		return nil, err
 	}
+
+	var names []string
+	for k := range typesMap {
+		names = append(names, k)
+	}
+
+	sort.Strings(names)
+
+	resourceTypes := make([]*providerpb.FieldSchema, len(names))
+
+	for i, name := range names {
+		resourceTypes[i] = typesMap[name]
+	}
+
+	for _, t := range resourceTypes {
+		switch t.GetType() {
+		case providerpb.FieldType_STRUCT:
+			o, err := generateStructType(resource.GetType(), "", t)
+			if err != nil {
+				return nil, err
+			}
+
+			out = append(out, o...)
+		default:
+			return nil, fmt.Errorf("unsupported type: %s", t.GetType())
+		}
+	}
+
+	return format.Source(out)
+}
+
+func GenerateResourceSrc(module, outputPath string, resource *providerpb.ResourceSchema) ([]byte, error) {
+	name := resource.GetType()
+
+	tmpl, err := template.New("resource").
+		Funcs(template.FuncMap{
+			"toPascalCase": util.PascalCase,
+		}).
+		Parse(resourceTmpl)
+	if err != nil {
+		return nil, err
+	}
+
+	imports := []string{
+		`"context"`,
+		`"fmt"`,
+		`sdk "github.com/alchematik/athanor-go/sdk/provider/value"`,
+		fmt.Sprintf("\"%s\"", filepath.Join(module, outputPath, "identifier")),
+	}
+
+	data := map[string]any{
+		"PackageName": name,
+		"Type":        util.PascalCase(name),
+		"Imports":     imports,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return nil, err
+	}
+
+	out := buf.Bytes()
+
+	typesMap := map[string]*providerpb.FieldSchema{}
+
+	// id := resource.GetIdentifier()
+	// id.Name = resource.GetType() + "_identifier"
+	// typesMap[id.Name] = id
+	// if err := addTypes(typesMap, id); err != nil {
+	// 	return nil, err
+	// }
 
 	config := resource.GetConfig()
 	config.Name = resource.GetType() + "_config"
@@ -124,7 +195,7 @@ func GenerateResourceSrc(resource *providerpb.ResourceSchema) ([]byte, error) {
 	for _, t := range resourceTypes {
 		switch t.GetType() {
 		case providerpb.FieldType_STRUCT:
-			o, err := generateStructType(name, t)
+			o, err := generateStructType(name, "identifier.", t)
 			if err != nil {
 				return nil, err
 			}
@@ -160,14 +231,14 @@ func addTypes(types map[string]*providerpb.FieldSchema, field *providerpb.FieldS
 	return nil
 }
 
-func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) {
+func generateStructType(name string, idPackage string, t *providerpb.FieldSchema) ([]byte, error) {
 	tmpl, err := template.New("struct_type").
 		Funcs(template.FuncMap{
 			"toPascalCase": util.PascalCase,
 			"parseFieldFunc": func(f *providerpb.FieldSchema) (string, error) {
-				if f.IsIdentifier {
-					return "ParseIdentifier", nil
-				}
+				// if f.IsIdentifier {
+				// 	return "ParseIdentifier", nil
+				// }
 				switch f.GetType() {
 				case providerpb.FieldType_STRING:
 					return "sdk.String", nil
@@ -178,7 +249,7 @@ func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) 
 				case providerpb.FieldType_FILE:
 					return "sdk.ParseFile", nil
 				case providerpb.FieldType_IDENTIFIER:
-					return "sdk.ParseIdentifier", nil
+					return idPackage + "ParseIdentifier", nil
 				default:
 					return "", fmt.Errorf("unsupported type %s", f.GetType())
 				}
@@ -198,7 +269,7 @@ func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) 
 				case providerpb.FieldType_FILE:
 					return "sdk.File", nil
 				case providerpb.FieldType_IDENTIFIER:
-					return "sdk.Identifier", nil
+					return "sdk.ResourceIdentifier", nil
 				default:
 					return "", fmt.Errorf("unrecognized type: %s", f.GetType())
 				}
@@ -220,4 +291,18 @@ func generateStructType(name string, t *providerpb.FieldSchema) ([]byte, error) 
 	}
 
 	return buffer.Bytes(), nil
+}
+
+func hasIdentifierField(s *providerpb.FieldSchema) bool {
+	if s.GetType() == providerpb.FieldType_IDENTIFIER {
+		return true
+	}
+
+	for _, f := range s.GetFields() {
+		if hasIdentifierField(f) {
+			return true
+		}
+	}
+
+	return false
 }

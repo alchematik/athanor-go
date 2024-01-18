@@ -4,33 +4,23 @@
 package {{ .PackageName }}
 
 import (
-	"context"
-	"fmt"
-
-	sdk "github.com/alchematik/athanor-go/sdk/provider/value"
+	{{ range .Imports -}}
+		{{ . }}
+	{{ end }}
 )
 
 type {{ .Type }} struct {
-	Identifier {{ .Type }}Identifier
+	Identifier identifier.{{ .Type }}Identifier
 	Config     {{ .Type }}Config
 	Attrs      {{ .Type }}Attrs
 }
 
 func (x {{ .Type }}) ToResourceValue() (sdk.Resource, error) {
-	id, err := x.Identifier.ToValue()
-	if err != nil {
-		return sdk.Resource{}, nil
-	}
+	id := x.Identifier.ToValue()
 
-	config, err := x.Config.ToValue()
-	if err != nil {
-		return sdk.Resource{}, nil
-	}
+	config := x.Config.ToValue()
 
-	attrs, err := x.Attrs.ToValue()
-	if err != nil {
-		return sdk.Resource{}, nil
-	}
+	attrs := x.Attrs.ToValue()
 
 	return sdk.Resource{
 		Identifier: id,
@@ -40,19 +30,19 @@ func (x {{ .Type }}) ToResourceValue() (sdk.Resource, error) {
 }
 
 type {{ .Type }}Getter interface {
-	Get{{ .Type }}(context.Context, {{ .Type }}Identifier) ({{ .Type }}, error)
+	Get{{ .Type }}(context.Context, identifier.{{ .Type }}Identifier) ({{ .Type }}, error)
 }
 
 type {{ .Type }}Creator interface {
-	Create{{ .Type }}(context.Context, {{ .Type }}Identifier, {{ .Type }}Config) ({{ .Type }}, error)
+	Create{{ .Type }}(context.Context, identifier.{{ .Type }}Identifier, {{ .Type }}Config) ({{ .Type }}, error)
 }
 
 type {{ .Type }}Updator interface {
-	Update{{ .Type }}(context.Context, {{ .Type }}Identifier, {{ .Type }}Config, []sdk.UpdateMaskField) ({{ .Type }}, error)
+	Update{{ .Type }}(context.Context, identifier.{{ .Type }}Identifier, {{ .Type }}Config, []sdk.UpdateMaskField) ({{ .Type }}, error)
 }
 
 type {{ .Type }}Deleter interface {
-	Delete{{ .Type }}(context.Context, {{ .Type }}Identifier) error
+	Delete{{ .Type }}(context.Context, identifier.{{ .Type }}Identifier) error
 }
 
 type {{ .Type }}Handler struct {
@@ -67,7 +57,7 @@ func (h {{ .Type }}Handler) GetResource(ctx context.Context, id sdk.Identifier) 
 		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
-	idVal, err := Parse{{ .Type }}Identifier(id)
+	idVal, err := identifier.Parse{{ .Type }}Identifier(id)
 	if err != nil {
 		return sdk.Resource{}, err
 	}
@@ -85,7 +75,7 @@ func (h {{ .Type }}Handler) CreateResource(ctx context.Context, id sdk.Identifie
 		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
-	idVal, err := Parse{{ .Type }}Identifier(id)
+	idVal, err := identifier.Parse{{ .Type }}Identifier(id)
 	if err != nil {
 		return sdk.Resource{}, err
 	}
@@ -108,7 +98,7 @@ func (h {{ .Type }}Handler) UpdateResource(ctx context.Context, id sdk.Identifie
 		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
 
-	idVal, err := Parse{{ .Type }}Identifier(id)
+	idVal, err := identifier.Parse{{ .Type }}Identifier(id)
 	if err != nil {
 		return sdk.Resource{}, err
 	}
@@ -131,7 +121,7 @@ func (h {{ .Type }}Handler) DeleteResource(ctx context.Context, id sdk.Identifie
 		return fmt.Errorf("unimplemented")
 	}
 
-	idVal, err := Parse{{ .Type }}Identifier(id)
+	idVal, err := identifier.Parse{{ .Type }}Identifier(id)
 	if err != nil {
 		return err
 	}

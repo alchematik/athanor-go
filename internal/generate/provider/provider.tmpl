@@ -7,10 +7,6 @@ import (
   "fmt"
 
 	sdk "github.com/alchematik/athanor-go/sdk/provider/value"
-
-	{{ range .Types -}}
-	  "{{ $.ImportPrefix }}/{{ . }}"
-	{{ end }}
 )
 
 func ParseIdentifier(v any) (sdk.ResourceIdentifier, error) {
@@ -22,7 +18,7 @@ func ParseIdentifier(v any) (sdk.ResourceIdentifier, error) {
   switch id.ResourceType {
 {{ range .Types -}}
   case "{{ . }}":
-    return {{ . }}.Parse{{ toPascalCase . }}Identifier(id.Value)
+    return Parse{{ toPascalCase . }}Identifier(id)
 {{ end }}
   default:
     return nil, fmt.Errorf("invalid resource type: %s", id.ResourceType)

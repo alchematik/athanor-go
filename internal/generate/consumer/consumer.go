@@ -30,7 +30,7 @@ func GenerateResourceSrc(schema *providerpb.Schema, resource *providerpb.Resourc
 	}
 
 	data := map[string]any{
-		"PackageName": schema.Name,
+		"PackageName": resource.GetType(),
 	}
 
 	var buf bytes.Buffer

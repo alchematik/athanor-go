@@ -7,6 +7,7 @@ import (
 
 type ResourceIdentifier interface {
 	ResourceType() string
+	ToValue() Identifier
 }
 
 func Map(val any) (map[string]any, error) {
@@ -114,32 +115,43 @@ type ResourceType interface {
 }
 
 type Resource struct {
-	Identifier any
+	Identifier Identifier
 	Config     any
 	Attrs      any
 }
 
 func (r Resource) ToResourceProto() (*providerpb.Resource, error) {
-	id, err := ToValueProto(r.Identifier)
+	idProto, err := ToValueProto(r.Identifier)
 	if err != nil {
 		return nil, err
 	}
 
-	config, err := ToValueProto(r.Config)
+	configProto, err := ToValueProto(r.Config)
 	if err != nil {
 		return nil, err
 	}
 
-	attrs, err := ToValueProto(r.Attrs)
+	attrsProto, err := ToValueProto(r.Attrs)
 	if err != nil {
 		return nil, err
 	}
 
 	return &providerpb.Resource{
-		Identifier: id,
-		Config:     config,
-		Attrs:      attrs,
+		Identifier: idProto,
+		Config:     configProto,
+		Attrs:      attrsProto,
 	}, nil
+}
+
+func ToType(val any) any {
+	switch v := val.(type) {
+	case ResourceIdentifier:
+		return v.ToValue()
+	case ResourceType:
+		return v.ToValue()
+	default:
+		return v
+	}
 }
 
 func ToValueProto(val any) (*providerpb.Value, error) {
@@ -186,8 +198,8 @@ func ToValueProto(val any) (*providerpb.Value, error) {
 				},
 			},
 		}, nil
-	case ResourceType:
-		return ToValueProto(v.ToValue())
+	// case ResourceType:
+	// 	return ToValueProto(v.ToValue())
 	case File:
 		return &providerpb.Value{
 			Type: &providerpb.Value_File{

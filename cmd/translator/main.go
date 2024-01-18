@@ -81,11 +81,11 @@ func (s *Server) GenerateProviderSDK(ctx context.Context, req *translatorpb.Gene
 		return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	if err := os.MkdirAll(filepath.Join(req.GetOutputPath(), "provider"), 0777); err != nil {
+	if err := os.MkdirAll(filepath.Join(req.GetOutputPath(), "identifier"), 0777); err != nil {
 		return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	providerFile, err := os.Create(filepath.Join(req.GetOutputPath(), "provider", "provider.go"))
+	providerFile, err := os.Create(filepath.Join(req.GetOutputPath(), "identifier", "identifier.go"))
 	if err != nil {
 		return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 	}
@@ -119,12 +119,27 @@ func (s *Server) GenerateProviderSDK(ctx context.Context, req *translatorpb.Gene
 			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 		}
 
-		src, err := provider.GenerateResourceSrc(resource)
+		src, err := provider.GenerateResourceSrc(mod, req.GetOutputPath(), resource)
+		if err != nil {
+			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, "error generating resource src: "+err.Error())
+		}
+
+		if _, err := f.Write(src); err != nil {
+			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
+		}
+
+		// Make id file.
+		idFile, err := os.Create(filepath.Join(req.GetOutputPath(), "identifier", resource.GetType()+".go"))
 		if err != nil {
 			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 		}
 
-		if _, err := f.Write(src); err != nil {
+		src, err = provider.GenerateIdentifierSrc(resource)
+		if err != nil {
+			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, "error generating identifier src: "+err.Error())
+		}
+
+		if _, err := idFile.Write(src); err != nil {
 			return &translatorpb.GenerateProvierSDKResponse{}, status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -143,17 +158,19 @@ func (s *Server) GenerateConsumerSDK(ctx context.Context, req *translatorpb.Gene
 		return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	if err := os.MkdirAll(req.GetOutputPath(), 0777); err != nil {
-		return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
-	}
-
 	resources := schema.GetResources()
 	sort.Slice(resources, func(i, j int) bool {
 		return resources[i].GetType() < resources[j].GetType()
 	})
 
 	for _, resource := range resources {
-		f, err := os.Create(filepath.Join(req.GetOutputPath(), resource.GetType()+".go"))
+		outPath := filepath.Join(req.GetOutputPath(), resource.GetType())
+
+		if err := os.MkdirAll(outPath, 0777); err != nil {
+			return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
+		}
+
+		f, err := os.Create(filepath.Join(outPath, "resource.go"))
 		if err != nil {
 			return &translatorpb.GenerateConsumerSDKResponse{}, status.Error(codes.Internal, err.Error())
 		}
