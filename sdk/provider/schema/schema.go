@@ -11,6 +11,7 @@ const (
 	FieldTypeMap        FieldType = "map"
 	FieldTypeFile       FieldType = "file"
 	FieldTypeIdentifier FieldType = "identifier"
+	FieldTypeBool       FieldType = "bool"
 )
 
 type Schema struct {
@@ -85,6 +86,8 @@ func (f FieldType) ToProto() providerpb.FieldType {
 		return providerpb.FieldType_FILE
 	case FieldTypeIdentifier:
 		return providerpb.FieldType_IDENTIFIER
+	case FieldTypeBool:
+		return providerpb.FieldType_BOOL
 	default:
 		return providerpb.FieldType_EMPTY
 	}

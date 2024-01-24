@@ -28,6 +28,15 @@ func String(val any) (string, error) {
 	return s, nil
 }
 
+func Bool(val any) (bool, error) {
+	b, ok := val.(bool)
+	if !ok {
+		return false, fmt.Errorf("expected bool, got %T", val)
+	}
+
+	return b, nil
+}
+
 func ParseIdentifier(val any) (Identifier, error) {
 	id, ok := val.(Identifier)
 	if !ok {

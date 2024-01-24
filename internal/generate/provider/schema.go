@@ -250,6 +250,8 @@ func generateStructType(name string, idPackage string, t *providerpb.FieldSchema
 					return "sdk.ParseFile", nil
 				case providerpb.FieldType_IDENTIFIER:
 					return idPackage + "ParseIdentifier", nil
+				case providerpb.FieldType_BOOL:
+					return "sdk.Bool", nil
 				default:
 					return "", fmt.Errorf("unsupported type %s", f.GetType())
 				}
@@ -270,6 +272,8 @@ func generateStructType(name string, idPackage string, t *providerpb.FieldSchema
 					return "sdk.File", nil
 				case providerpb.FieldType_IDENTIFIER:
 					return "sdk.ResourceIdentifier", nil
+				case providerpb.FieldType_BOOL:
+					return "bool", nil
 				default:
 					return "", fmt.Errorf("unrecognized type: %s", f.GetType())
 				}
