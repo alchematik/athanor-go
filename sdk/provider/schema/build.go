@@ -13,7 +13,12 @@ func Build(s Schema) error {
 		return err
 	}
 
-	data, err := json.Marshal(s.ToProto())
+	p, err := s.ToProto()
+	if err != nil {
+		return err
+	}
+
+	data, err := json.Marshal(p)
 	if err != nil {
 		return err
 	}

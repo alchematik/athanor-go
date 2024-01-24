@@ -11,8 +11,8 @@ import (
 
 type {{ .Type }} struct {
 	Identifier identifier.{{ .Type }}Identifier
-	Config     {{ .Type }}Config
-	Attrs      {{ .Type }}Attrs
+	Config     Config
+	Attrs      Attrs
 }
 
 func (x {{ .Type }}) ToResourceValue() (sdk.Resource, error) {
@@ -34,11 +34,11 @@ type {{ .Type }}Getter interface {
 }
 
 type {{ .Type }}Creator interface {
-	Create{{ .Type }}(context.Context, identifier.{{ .Type }}Identifier, {{ .Type }}Config) ({{ .Type }}, error)
+	Create{{ .Type }}(context.Context, identifier.{{ .Type }}Identifier, Config) ({{ .Type }}, error)
 }
 
 type {{ .Type }}Updator interface {
-	Update{{ .Type }}(context.Context, identifier.{{ .Type }}Identifier, {{ .Type }}Config, []sdk.UpdateMaskField) ({{ .Type }}, error)
+	Update{{ .Type }}(context.Context, identifier.{{ .Type }}Identifier, Config, []sdk.UpdateMaskField) ({{ .Type }}, error)
 }
 
 type {{ .Type }}Deleter interface {
@@ -80,7 +80,7 @@ func (h {{ .Type }}Handler) CreateResource(ctx context.Context, id sdk.Identifie
 		return sdk.Resource{}, err
 	}
 
-	configVal, err := Parse{{ .Type }}Config(config)
+	configVal, err := ParseConfig(config)
 	if err != nil {
 		return sdk.Resource{}, err
 	}
@@ -103,7 +103,7 @@ func (h {{ .Type }}Handler) UpdateResource(ctx context.Context, id sdk.Identifie
 		return sdk.Resource{}, err
 	}
 
-	configVal, err := Parse{{ .Type }}Config(config)
+	configVal, err := ParseConfig(config)
 	if err != nil {
 		return sdk.Resource{}, err
 	}

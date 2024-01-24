@@ -10,13 +10,22 @@ type ResourceIdentifier interface {
 	ToValue() Identifier
 }
 
-func Map(val any) (map[string]any, error) {
-	m, ok := val.(map[string]any)
+func Map[T any](val any) (map[string]T, error) {
+	m, ok := val.(map[string]T)
 	if !ok {
 		return nil, fmt.Errorf("expected map, got %T", val)
 	}
 
 	return m, nil
+}
+
+func List[T any](val any) ([]T, error) {
+	l, ok := val.([]T)
+	if !ok {
+		return nil, fmt.Errorf("expected list, got %T", val)
+	}
+
+	return l, nil
 }
 
 func String(val any) (string, error) {
@@ -152,12 +161,24 @@ func (r Resource) ToResourceProto() (*providerpb.Resource, error) {
 	}, nil
 }
 
-func ToType(val any) any {
+func ToType[T any](val any) any {
 	switch v := val.(type) {
 	case ResourceIdentifier:
 		return v.ToValue()
 	case ResourceType:
 		return v.ToValue()
+	case map[string]T:
+		m := map[string]any{}
+		for k, v := range v {
+			m[k] = v
+		}
+		return m
+	case []T:
+		l := make([]any, len(v))
+		for i := range v {
+			l[i] = v[i]
+		}
+		return l
 	default:
 		return v
 	}

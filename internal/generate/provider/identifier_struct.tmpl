@@ -4,17 +4,24 @@ type {{ toPascalCase .Type.Name }} struct {
 {{ end }}
 }
 
-func (x {{ toPascalCase .Type.Name }}) ToValue() any {
-  return map[string]any{
+func (x {{ toPascalCase .Type.Name }}) ToValue() sdk.Identifier {
+  return sdk.Identifier{
+    ResourceType: "{{ .ResourceName }}",
+    Value: map[string]any{
   {{ range $k, $v := .Type.Fields -}}
     "{{ $k }}": {{ toTypeFunc $v }}(x.{{ toPascalCase $k }}),
   {{ end }}
+    },
   }
 }
 
-func Parse{{ toPascalCase .Type.Name }}(v any) ({{ toPascalCase .Type.Name }}, error) {
+func (x {{ toPascalCase .Type.Name }}) ResourceType() string {
+  return "{{ .ResourceName }}"
+}
+
+func Parse{{ toPascalCase .Type.Name }}(v sdk.Identifier) ({{ toPascalCase .Type.Name }}, error) {
   {{ $length := len .Type.Fields }} {{ if gt $length 0 }}
-  m, err := sdk.Map[any](v)
+  m, err := sdk.Map[any](v.Value)
   if err != nil {
     return {{ toPascalCase .Type.Name }}{}, nil
   }

@@ -1,17 +1,9 @@
 package schema
 
 import (
-	providerpb "github.com/alchematik/athanor-go/internal/gen/go/proto/provider/v1"
-)
+	"fmt"
 
-const (
-	FieldTypeEmpty      FieldType = ""
-	FieldTypeString     FieldType = "string"
-	FieldTypeStruct     FieldType = "struct"
-	FieldTypeMap        FieldType = "map"
-	FieldTypeFile       FieldType = "file"
-	FieldTypeIdentifier FieldType = "identifier"
-	FieldTypeBool       FieldType = "bool"
+	providerpb "github.com/alchematik/athanor-go/internal/gen/go/proto/provider/v1"
 )
 
 type Schema struct {
@@ -20,17 +12,21 @@ type Schema struct {
 	Resources []ResourceSchema
 }
 
-func (s Schema) ToProto() *providerpb.Schema {
+func (s Schema) ToProto() (*providerpb.Schema, error) {
 	resources := make([]*providerpb.ResourceSchema, len(s.Resources))
 	for i, r := range s.Resources {
-		resources[i] = r.ToProto()
+		var err error
+		resources[i], err = r.ToProto()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &providerpb.Schema{
 		Name:      s.Name,
 		Version:   s.Version,
 		Resources: resources,
-	}
+	}, nil
 }
 
 type ResourceSchema struct {
@@ -40,55 +36,174 @@ type ResourceSchema struct {
 	Attrs      FieldSchema
 }
 
-func (r ResourceSchema) ToProto() *providerpb.ResourceSchema {
+func (r ResourceSchema) ToProto() (*providerpb.ResourceSchema, error) {
+	idProto, err := FieldSchemaToProto(r.Identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	configProto, err := FieldSchemaToProto(r.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	attrProto, err := FieldSchemaToProto(r.Attrs)
+	if err != nil {
+		return nil, err
+	}
+
 	return &providerpb.ResourceSchema{
 		Type:       r.Type,
-		Identifier: r.Identifier.ToProto(),
-		Config:     r.Config.ToProto(),
-		Attrs:      r.Attrs.ToProto(),
+		Identifier: idProto,
+		Config:     configProto,
+		Attrs:      attrProto,
+	}, nil
+}
+
+func String() StringSchema {
+	return StringSchema{}
+}
+
+func Bool() BoolSchema {
+	return BoolSchema{}
+}
+
+func Map(value FieldSchema) MapSchema {
+	return MapSchema{
+		Value: value,
 	}
 }
 
-type FieldSchema struct {
-	Name         string
-	Type         FieldType
-	Fields       []FieldSchema
-	IsIdentifier bool
+func File() FileSchema {
+	return FileSchema{}
 }
 
-func (f FieldSchema) ToProto() *providerpb.FieldSchema {
-	fields := make([]*providerpb.FieldSchema, len(f.Fields))
-	for i, field := range f.Fields {
-		fields[i] = field.ToProto()
-	}
+func Identifier() IdentifierSchema {
+	return IdentifierSchema{}
+}
 
-	return &providerpb.FieldSchema{
-		Name:         f.Name,
-		Type:         f.Type.ToProto(),
-		Fields:       fields,
-		IsIdentifier: f.IsIdentifier,
+func List(element FieldSchema) ListSchema {
+	return ListSchema{
+		Element: element,
 	}
 }
 
-type FieldType string
+func Struct(name string, fields map[string]FieldSchema) StructSchema {
+	return StructSchema{
+		Name:   name,
+		Fields: fields,
+	}
+}
 
-func (f FieldType) ToProto() providerpb.FieldType {
-	switch f {
-	case FieldTypeEmpty:
-		return providerpb.FieldType_EMPTY
-	case FieldTypeString:
-		return providerpb.FieldType_STRING
-	case FieldTypeStruct:
-		return providerpb.FieldType_STRUCT
-	case FieldTypeMap:
-		return providerpb.FieldType_MAP
-	case FieldTypeFile:
-		return providerpb.FieldType_FILE
-	case FieldTypeIdentifier:
-		return providerpb.FieldType_IDENTIFIER
-	case FieldTypeBool:
-		return providerpb.FieldType_BOOL
+type FieldSchema interface {
+}
+
+type StringSchema struct {
+	FieldSchema
+}
+
+type BoolSchema struct {
+	FieldSchema
+}
+
+type MapSchema struct {
+	FieldSchema
+
+	Value FieldSchema
+}
+
+type FileSchema struct {
+	FieldSchema
+}
+
+type IdentifierSchema struct {
+	FieldSchema
+}
+
+type ListSchema struct {
+	FieldSchema
+
+	Element FieldSchema
+}
+
+type StructSchema struct {
+	FieldSchema
+
+	Name   string
+	Fields map[string]FieldSchema
+}
+
+func FieldSchemaToProto(f FieldSchema) (*providerpb.FieldSchema, error) {
+	switch val := f.(type) {
+	case StringSchema:
+		return &providerpb.FieldSchema{
+			Type: &providerpb.FieldSchema_StringSchema{
+				StringSchema: &providerpb.StringSchema{},
+			},
+		}, nil
+	case BoolSchema:
+		return &providerpb.FieldSchema{
+			Type: &providerpb.FieldSchema_BoolSchema{
+				BoolSchema: &providerpb.BoolSchema{},
+			},
+		}, nil
+	case MapSchema:
+		valProto, err := FieldSchemaToProto(val.Value)
+		if err != nil {
+			return nil, err
+		}
+
+		return &providerpb.FieldSchema{
+			Type: &providerpb.FieldSchema_MapSchema{
+				MapSchema: &providerpb.MapSchema{
+					Value: valProto,
+				},
+			},
+		}, nil
+	case IdentifierSchema:
+		return &providerpb.FieldSchema{
+			Type: &providerpb.FieldSchema_IdentifierSchema{
+				IdentifierSchema: &providerpb.IdentifierSchema{},
+			},
+		}, nil
+	case ListSchema:
+		elementProto, err := FieldSchemaToProto(val.Element)
+		if err != nil {
+			return nil, err
+		}
+
+		return &providerpb.FieldSchema{
+			Type: &providerpb.FieldSchema_ListSchema{
+				ListSchema: &providerpb.ListSchema{
+					Element: elementProto,
+				},
+			},
+		}, nil
+	case StructSchema:
+		m := map[string]*providerpb.FieldSchema{}
+		for k, v := range val.Fields {
+			var err error
+			m[k], err = FieldSchemaToProto(v)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return &providerpb.FieldSchema{
+			Type: &providerpb.FieldSchema_StructSchema{
+				StructSchema: &providerpb.StructSchema{
+					Name:   val.Name,
+					Fields: m,
+				},
+			},
+		}, nil
+	case FileSchema:
+		return &providerpb.FieldSchema{
+			Type: &providerpb.FieldSchema_FileSchema{
+				FileSchema: &providerpb.FileSchema{},
+			},
+		}, nil
 	default:
-		return providerpb.FieldType_EMPTY
+		return nil, fmt.Errorf("invalid type for schema: %T", f)
 	}
 }

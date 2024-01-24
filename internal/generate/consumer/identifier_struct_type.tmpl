@@ -1,13 +1,18 @@
 type {{ toPascalCase .Type.Name }} struct {
+  Alias string
 {{ range $k, $v := .Type.Fields -}}
   {{ toPascalCase $k }} any
 {{ end }}
 }
 
 func (x {{ toPascalCase .Type.Name }}) ToExpr() any {
-  return map[string]any{
+  return sdk.ResourceIdentifier{
+    ResourceType: "{{ .ResourceName }}",
+    Alias: x.Alias,
+    Value: map[string]any{
   {{ range $k, $v := .Type.Fields -}}
     "{{ $k }}": x.{{ toPascalCase $k }},
   {{ end }}
+    },
   }
 }
