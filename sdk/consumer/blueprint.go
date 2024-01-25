@@ -137,6 +137,22 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 				},
 			},
 		}, nil
+	case []any:
+		p := make([]*blueprintpb.Expr, len(e))
+		for i, val := range e {
+			var err error
+			p[i], err = toExprProto(val)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return &blueprintpb.Expr{
+			Type: &blueprintpb.Expr_List{
+				List: &blueprintpb.ListExpr{
+					Elements: p,
+				},
+			},
+		}, nil
 	case File:
 		return &blueprintpb.Expr{
 			Type: &blueprintpb.Expr_File{
@@ -219,6 +235,6 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 			Type: &blueprintpb.Expr_Nil{},
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsuppoprted expression: %T", expr)
+		return nil, fmt.Errorf("unsupported expression: %T", expr)
 	}
 }

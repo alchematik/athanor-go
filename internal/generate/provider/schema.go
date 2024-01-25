@@ -194,7 +194,7 @@ func GenerateResourceSrc(module, outputPath string, resource *providerpb.Resourc
 	for _, t := range resourceTypes {
 		switch t.GetType().(type) {
 		case *providerpb.FieldSchema_StructSchema:
-			o, err := generateStructType(t.GetStructSchema())
+			o, err := generateStructType(name, t.GetStructSchema())
 			if err != nil {
 				return nil, err
 			}
@@ -222,7 +222,7 @@ func findStructs(m map[string]*providerpb.FieldSchema, field *providerpb.FieldSc
 	}
 }
 
-func generateStructType(t *providerpb.StructSchema) ([]byte, error) {
+func generateStructType(resourceName string, t *providerpb.StructSchema) ([]byte, error) {
 	tmpl, err := template.New("struct_type").
 		Funcs(template.FuncMap{
 			"toPascalCase": util.PascalCase,
@@ -264,7 +264,8 @@ func generateStructType(t *providerpb.StructSchema) ([]byte, error) {
 	}
 
 	data := map[string]any{
-		"Type": t,
+		"Type":         t,
+		"ResourceName": resourceName,
 	}
 
 	var buffer bytes.Buffer

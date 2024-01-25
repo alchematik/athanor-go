@@ -11,21 +11,40 @@ type ResourceIdentifier interface {
 }
 
 func Map[T any](val any) (map[string]T, error) {
-	m, ok := val.(map[string]T)
+	m, ok := val.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("expected map, got %T", val)
+		return nil, fmt.Errorf("expected %T, got %T", map[string]T{}, val)
 	}
 
-	return m, nil
+	out := map[string]T{}
+	for k, v := range m {
+		val, ok := v.(T)
+		if !ok {
+			return nil, fmt.Errorf("expected value to be %T, got %T", val, v)
+		}
+		out[k] = val
+	}
+
+	return out, nil
 }
 
 func List[T any](val any) ([]T, error) {
-	l, ok := val.([]T)
+	l, ok := val.([]any)
 	if !ok {
 		return nil, fmt.Errorf("expected list, got %T", val)
 	}
 
-	return l, nil
+	out := make([]T, len(l))
+	for i, e := range l {
+		val, ok := e.(T)
+		if !ok {
+			return nil, fmt.Errorf("expected %T, got %T", val, e)
+		}
+
+		out[i] = val
+	}
+
+	return out, nil
 }
 
 func String(val any) (string, error) {
@@ -88,6 +107,16 @@ func ParseProto(val *providerpb.Value) (any, error) {
 			Path:     v.File.Path,
 			Checksum: v.File.Checksum,
 		}, nil
+	case *providerpb.Value_List:
+		list := make([]any, len(v.List.Elements))
+		for i, e := range v.List.Elements {
+			var err error
+			list[i], err = ParseProto(e)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return list, nil
 	default:
 		return nil, fmt.Errorf("unhandled proto type: %T", v)
 	}
@@ -215,6 +244,22 @@ func ToValueProto(val any) (*providerpb.Value, error) {
 				},
 			},
 		}, nil
+	case []any:
+		p := make([]*providerpb.Value, len(v))
+		for i, e := range v {
+			var err error
+			p[i], err = ToValueProto(e)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return &providerpb.Value{
+			Type: &providerpb.Value_List{
+				List: &providerpb.ListValue{
+					Elements: p,
+				},
+			},
+		}, nil
 	case Identifier:
 		converted, err := ToValueProto(v.Value)
 		if err != nil {
@@ -240,6 +285,6 @@ func ToValueProto(val any) (*providerpb.Value, error) {
 			},
 		}, nil
 	default:
-		return nil, fmt.Errorf("invalid type: %T", v)
+		return nil, fmt.Errorf("invalid type: %T", val)
 	}
 }

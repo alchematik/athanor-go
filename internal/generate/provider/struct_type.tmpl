@@ -16,14 +16,14 @@ func Parse{{ toPascalCase .Type.Name }}(v any) ({{ toPascalCase .Type.Name }}, e
   {{ $length := len .Type.Fields }} {{ if gt $length 0 }}
   m, err := sdk.Map[any](v)
   if err != nil {
-    return {{ toPascalCase .Type.Name }}{}, nil
+    return {{ toPascalCase .Type.Name }}{}, fmt.Errorf("error parsing {{ .Type.Name }}: %v", err)
   }
   {{ end }}
 
   {{ range $k, $v := .Type.Fields -}}
   {{ $k }}, err := {{ parseFieldFunc $v }}(m["{{ $k }}"])
   if err != nil {
-    return {{ toPascalCase $.Type.Name }}{}, nil
+    return {{ toPascalCase $.Type.Name }}{}, fmt.Errorf("error parsing {{ $.Type.Name }} for {{ $.ResourceName }}: %v", err)
   }
   {{ end }}
 
