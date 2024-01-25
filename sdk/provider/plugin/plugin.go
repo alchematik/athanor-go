@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func Serve(handlers map[string]ResourceHandler) {
+func Serve(handlers map[string]ResoureceHandlerInitializer) {
 	hcplugin.Serve(&hcplugin.ServeConfig{
 		HandshakeConfig: hcplugin.HandshakeConfig{
 			ProtocolVersion:  1,
@@ -52,18 +52,28 @@ type ResourceHandler interface {
 	CreateResource(context.Context, value.Identifier, any) (value.Resource, error)
 	UpdateResource(context.Context, value.Identifier, any, []value.UpdateMaskField) (value.Resource, error)
 	DeleteResource(context.Context, value.Identifier) error
+
+	Close() error
 }
 
+type ResoureceHandlerInitializer func(context.Context) (ResourceHandler, error)
+
 type server struct {
-	resourceHandlers map[string]ResourceHandler
+	resourceHandlers map[string]ResoureceHandlerInitializer
 }
 
 func (s *server) GetResource(ctx context.Context, req *providerpb.GetResourceRequest) (*providerpb.GetResourceResponse, error) {
 	t := req.GetIdentifier().GetIdentifier().GetType()
-	handler, ok := s.resourceHandlers[t]
+	initializer, ok := s.resourceHandlers[t]
 	if !ok {
 		return &providerpb.GetResourceResponse{}, status.Error(codes.NotFound, "resource type not found")
 	}
+
+	handler, err := initializer(ctx)
+	if err != nil {
+		return &providerpb.GetResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+	defer handler.Close()
 
 	id, err := value.ParseIdentifierProto(req.GetIdentifier().GetIdentifier())
 	if err != nil {
@@ -90,10 +100,16 @@ func (s *server) GetResource(ctx context.Context, req *providerpb.GetResourceReq
 
 func (s *server) CreateResource(ctx context.Context, req *providerpb.CreateResourceRequest) (*providerpb.CreateResourceResponse, error) {
 	t := req.GetIdentifier().GetIdentifier().GetType()
-	handler, ok := s.resourceHandlers[t]
+	initializer, ok := s.resourceHandlers[t]
 	if !ok {
 		return &providerpb.CreateResourceResponse{}, status.Error(codes.NotFound, "resource type not found")
 	}
+
+	handler, err := initializer(ctx)
+	if err != nil {
+		return &providerpb.CreateResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+	defer handler.Close()
 
 	id, err := value.ParseIdentifierProto(req.GetIdentifier().GetIdentifier())
 	if err != nil {
@@ -120,10 +136,16 @@ func (s *server) CreateResource(ctx context.Context, req *providerpb.CreateResou
 
 func (s *server) UpdateResource(ctx context.Context, req *providerpb.UpdateResourceRequest) (*providerpb.UpdateResourceResponse, error) {
 	t := req.GetIdentifier().GetIdentifier().GetType()
-	handler, ok := s.resourceHandlers[t]
+	initializer, ok := s.resourceHandlers[t]
 	if !ok {
 		return &providerpb.UpdateResourceResponse{}, status.Error(codes.NotFound, "resource type not found")
 	}
+
+	handler, err := initializer(ctx)
+	if err != nil {
+		return &providerpb.UpdateResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+	defer handler.Close()
 
 	id, err := value.ParseIdentifierProto(req.GetIdentifier().GetIdentifier())
 	if err != nil {
@@ -174,10 +196,16 @@ func parseUpdateMaskFieldProto(field *providerpb.Field) value.UpdateMaskField {
 
 func (s *server) DeleteResource(ctx context.Context, req *providerpb.DeleteResourceRequest) (*providerpb.DeleteResourceResponse, error) {
 	t := req.GetIdentifier().GetIdentifier().GetType()
-	handler, ok := s.resourceHandlers[t]
+	initializer, ok := s.resourceHandlers[t]
 	if !ok {
 		return &providerpb.DeleteResourceResponse{}, status.Error(codes.NotFound, "resource type not found")
 	}
+
+	handler, err := initializer(ctx)
+	if err != nil {
+		return &providerpb.DeleteResourceResponse{}, status.Error(codes.Internal, err.Error())
+	}
+	defer handler.Close()
 
 	id, err := value.ParseIdentifierProto(req.GetIdentifier().GetIdentifier())
 	if err != nil {

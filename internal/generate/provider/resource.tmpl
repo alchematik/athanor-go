@@ -50,9 +50,11 @@ type {{ .Type }}Handler struct {
 	{{ .Type }}Creator {{ .Type }}Creator
 	{{ .Type }}Updator {{ .Type }}Updator
 	{{ .Type }}Deleter {{ .Type }}Deleter
+
+	CloseFunc func() error
 }
 
-func (h {{ .Type }}Handler) GetResource(ctx context.Context, id sdk.Identifier) (sdk.Resource, error) {
+func (h *{{ .Type }}Handler) GetResource(ctx context.Context, id sdk.Identifier) (sdk.Resource, error) {
 	if h.{{ .Type }}Getter == nil {
 		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
@@ -70,7 +72,7 @@ func (h {{ .Type }}Handler) GetResource(ctx context.Context, id sdk.Identifier) 
 	return r.ToResourceValue()
 }
 
-func (h {{ .Type }}Handler) CreateResource(ctx context.Context, id sdk.Identifier, config any) (sdk.Resource, error) {
+func (h *{{ .Type }}Handler) CreateResource(ctx context.Context, id sdk.Identifier, config any) (sdk.Resource, error) {
 	if h.{{ .Type }}Creator == nil {
 		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
@@ -93,7 +95,7 @@ func (h {{ .Type }}Handler) CreateResource(ctx context.Context, id sdk.Identifie
 	return r.ToResourceValue()
 }
 
-func (h {{ .Type }}Handler) UpdateResource(ctx context.Context, id sdk.Identifier, config any, mask []sdk.UpdateMaskField) (sdk.Resource, error) {
+func (h *{{ .Type }}Handler) UpdateResource(ctx context.Context, id sdk.Identifier, config any, mask []sdk.UpdateMaskField) (sdk.Resource, error) {
 	if h.{{ .Type }}Updator == nil {
 		return sdk.Resource{}, fmt.Errorf("unimplemented")
 	}
@@ -116,7 +118,7 @@ func (h {{ .Type }}Handler) UpdateResource(ctx context.Context, id sdk.Identifie
 	return r.ToResourceValue()
 }
 
-func (h {{ .Type }}Handler) DeleteResource(ctx context.Context, id sdk.Identifier) error {
+func (h *{{ .Type }}Handler) DeleteResource(ctx context.Context, id sdk.Identifier) error {
 	if h.{{ .Type }}Deleter == nil {
 		return fmt.Errorf("unimplemented")
 	}
@@ -127,4 +129,12 @@ func (h {{ .Type }}Handler) DeleteResource(ctx context.Context, id sdk.Identifie
 	}
 
 	return h.{{ .Type }}Deleter.Delete{{ .Type }}(ctx, idVal)
+}
+
+func (h *{{ .Type }}Handler) Close() error {
+	if h.CloseFunc != nil {
+		return h.CloseFunc()
+	}
+
+	return nil
 }
