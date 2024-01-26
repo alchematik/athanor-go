@@ -13,7 +13,7 @@ func (x {{ toPascalCase .Type.Name }}) ToValue() any {
 }
 
 func Parse{{ toPascalCase .Type.Name }}(v any) ({{ toPascalCase .Type.Name }}, error) {
-  {{ $length := len .Type.Fields }} {{ if gt $length 0 }}
+  {{ $length := len .Type.Fields }} {{ if gt $length 0 -}}
   m, err := sdk.Map[any](v)
   if err != nil {
     return {{ toPascalCase .Type.Name }}{}, fmt.Errorf("error parsing {{ .Type.Name }}: %v", err)

@@ -150,6 +150,10 @@ type File struct {
 	Checksum string
 }
 
+type Immutable struct {
+	Value any
+}
+
 type Operation string
 
 const (
@@ -210,6 +214,12 @@ func ToType[T any](val any) any {
 		return l
 	default:
 		return v
+	}
+}
+
+func ToImmutableType(subTypeConvertFunc func(any) any) func(any) Immutable {
+	return func(val any) Immutable {
+		return Immutable{Value: subTypeConvertFunc(val)}
 	}
 }
 
@@ -281,6 +291,19 @@ func ToValueProto(val any) (*providerpb.Value, error) {
 				File: &providerpb.FileValue{
 					Path:     v.Path,
 					Checksum: v.Checksum,
+				},
+			},
+		}, nil
+	case Immutable:
+		value, err := ToValueProto(v.Value)
+		if err != nil {
+			return nil, err
+		}
+
+		return &providerpb.Value{
+			Type: &providerpb.Value_Immutable{
+				Immutable: &providerpb.Immutable{
+					Value: value,
 				},
 			},
 		}, nil

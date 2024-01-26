@@ -88,6 +88,10 @@ func List(element FieldSchema) ListSchema {
 	}
 }
 
+func Immutable(value FieldSchema) ImmutableSchema {
+	return ImmutableSchema{Value: value}
+}
+
 func Struct(name string, fields map[string]FieldSchema) StructSchema {
 	return StructSchema{
 		Name:   name,
@@ -95,8 +99,7 @@ func Struct(name string, fields map[string]FieldSchema) StructSchema {
 	}
 }
 
-type FieldSchema interface {
-}
+type FieldSchema interface{}
 
 type StringSchema struct {
 	FieldSchema
@@ -131,6 +134,12 @@ type StructSchema struct {
 
 	Name   string
 	Fields map[string]FieldSchema
+}
+
+type ImmutableSchema struct {
+	FieldSchema
+
+	Value FieldSchema
 }
 
 func FieldSchemaToProto(f FieldSchema) (*providerpb.FieldSchema, error) {
@@ -201,6 +210,19 @@ func FieldSchemaToProto(f FieldSchema) (*providerpb.FieldSchema, error) {
 		return &providerpb.FieldSchema{
 			Type: &providerpb.FieldSchema_FileSchema{
 				FileSchema: &providerpb.FileSchema{},
+			},
+		}, nil
+	case ImmutableSchema:
+		value, err := FieldSchemaToProto(val.Value)
+		if err != nil {
+			return nil, err
+		}
+
+		return &providerpb.FieldSchema{
+			Type: &providerpb.FieldSchema_ImmutableSchema{
+				ImmutableSchema: &providerpb.ImmutableSchema{
+					Value: value,
+				},
 			},
 		}, nil
 	default:

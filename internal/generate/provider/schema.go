@@ -225,38 +225,10 @@ func findStructs(m map[string]*providerpb.FieldSchema, field *providerpb.FieldSc
 func generateStructType(resourceName string, t *providerpb.StructSchema) ([]byte, error) {
 	tmpl, err := template.New("struct_type").
 		Funcs(template.FuncMap{
-			"toPascalCase": util.PascalCase,
-			"parseFieldFunc": func(f *providerpb.FieldSchema) (string, error) {
-				switch val := f.GetType().(type) {
-				case *providerpb.FieldSchema_StringSchema:
-					return "sdk.String", nil
-				case *providerpb.FieldSchema_StructSchema:
-					return fmt.Sprintf("Parse%s", util.PascalCase(val.StructSchema.GetName())), nil
-				case *providerpb.FieldSchema_MapSchema:
-					subType, err := toType(val.MapSchema.GetValue())
-					if err != nil {
-						return "", err
-					}
-					return fmt.Sprintf("sdk.Map[%s]", subType), nil
-				case *providerpb.FieldSchema_ListSchema:
-					subType, err := toType(val.ListSchema.GetElement())
-					if err != nil {
-						return "", err
-					}
-
-					return fmt.Sprintf("sdk.List[%s]", subType), nil
-				case *providerpb.FieldSchema_FileSchema:
-					return "sdk.ParseFile", nil
-				case *providerpb.FieldSchema_IdentifierSchema:
-					return "identifier.ParseIdentifier", nil
-				case *providerpb.FieldSchema_BoolSchema:
-					return "sdk.Bool", nil
-				default:
-					return "", fmt.Errorf("unsupported type %T", f.GetType())
-				}
-			},
-			"toType":     toType,
-			"toTypeFunc": toTypeFunc,
+			"toPascalCase":   util.PascalCase,
+			"parseFieldFunc": parseFieldFunc("identifier."),
+			"toType":         toType,
+			"toTypeFunc":     toTypeFunc,
 		}).
 		Parse(structTypeTmpl)
 	if err != nil {
@@ -276,41 +248,47 @@ func generateStructType(resourceName string, t *providerpb.StructSchema) ([]byte
 	return buffer.Bytes(), nil
 }
 
+func parseFieldFunc(idPackage string) func(*providerpb.FieldSchema) (string, error) {
+	return func(f *providerpb.FieldSchema) (string, error) {
+		switch val := f.GetType().(type) {
+		case *providerpb.FieldSchema_StringSchema:
+			return "sdk.String", nil
+		case *providerpb.FieldSchema_StructSchema:
+			return fmt.Sprintf("Parse%s", util.PascalCase(val.StructSchema.GetName())), nil
+		case *providerpb.FieldSchema_MapSchema:
+			subType, err := toType(val.MapSchema.GetValue())
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("sdk.Map[%s]", subType), nil
+		case *providerpb.FieldSchema_ListSchema:
+			subType, err := toType(val.ListSchema.GetElement())
+			if err != nil {
+				return "", err
+			}
+
+			return fmt.Sprintf("sdk.List[%s]", subType), nil
+		case *providerpb.FieldSchema_FileSchema:
+			return "sdk.ParseFile", nil
+		case *providerpb.FieldSchema_IdentifierSchema:
+			return idPackage + "ParseIdentifier", nil
+		case *providerpb.FieldSchema_BoolSchema:
+			return "sdk.Bool", nil
+		case *providerpb.FieldSchema_ImmutableSchema:
+			return parseFieldFunc(idPackage)(val.ImmutableSchema.GetValue())
+		default:
+			return "", fmt.Errorf("unsupported type %T", f.GetType())
+		}
+	}
+}
+
 func generateIdentifierStructType(name string, t *providerpb.StructSchema) ([]byte, error) {
 	tmpl, err := template.New("identifier_struct_type").
 		Funcs(template.FuncMap{
-			"toPascalCase": util.PascalCase,
-			"parseFieldFunc": func(f *providerpb.FieldSchema) (string, error) {
-				switch val := f.GetType().(type) {
-				case *providerpb.FieldSchema_StringSchema:
-					return "sdk.String", nil
-				case *providerpb.FieldSchema_StructSchema:
-					return fmt.Sprintf("Parse%s", util.PascalCase(val.StructSchema.GetName())), nil
-				case *providerpb.FieldSchema_MapSchema:
-					subType, err := toType(val.MapSchema.GetValue())
-					if err != nil {
-						return "", err
-					}
-					return fmt.Sprintf("sdk.Map[%s]", subType), nil
-				case *providerpb.FieldSchema_ListSchema:
-					subType, err := toType(val.ListSchema.GetElement())
-					if err != nil {
-						return "", err
-					}
-
-					return fmt.Sprintf("sdk.List[%s]", subType), nil
-				case *providerpb.FieldSchema_FileSchema:
-					return "sdk.ParseFile", nil
-				case *providerpb.FieldSchema_IdentifierSchema:
-					return "ParseIdentifier", nil
-				case *providerpb.FieldSchema_BoolSchema:
-					return "sdk.Bool", nil
-				default:
-					return "", fmt.Errorf("unsupported type %s", f.GetType())
-				}
-			},
-			"toType":     toType,
-			"toTypeFunc": toTypeFunc,
+			"toPascalCase":   util.PascalCase,
+			"parseFieldFunc": parseFieldFunc(""),
+			"toType":         toType,
+			"toTypeFunc":     toTypeFunc,
 		}).
 		Parse(identifierStructTmpl)
 	if err != nil {
@@ -354,6 +332,8 @@ func toType(f *providerpb.FieldSchema) (string, error) {
 		return "sdk.ResourceIdentifier", nil
 	case *providerpb.FieldSchema_BoolSchema:
 		return "bool", nil
+	case *providerpb.FieldSchema_ImmutableSchema:
+		return toType(val.ImmutableSchema.GetValue())
 	default:
 		return "", fmt.Errorf("unrecognized type: %s", f.GetType())
 	}
@@ -375,6 +355,12 @@ func toTypeFunc(f *providerpb.FieldSchema) (string, error) {
 		}
 
 		return fmt.Sprintf("sdk.ToType[%s]", subType), nil
+	case *providerpb.FieldSchema_ImmutableSchema:
+		subType, err := toTypeFunc(val.ImmutableSchema.GetValue())
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("sdk.ToImmutableType(%s)", subType), nil
 	default:
 		return "sdk.ToType[any]", nil
 	}
