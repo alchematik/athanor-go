@@ -11,6 +11,10 @@ type ResourceIdentifier interface {
 }
 
 func Map[T any](val any) (map[string]T, error) {
+	if val == nil {
+		return nil, nil
+	}
+
 	m, ok := val.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("expected %T, got %T", map[string]T{}, val)
@@ -18,9 +22,13 @@ func Map[T any](val any) (map[string]T, error) {
 
 	out := map[string]T{}
 	for k, v := range m {
+		if v == nil {
+			continue
+		}
+
 		val, ok := v.(T)
 		if !ok {
-			return nil, fmt.Errorf("expected value to be %T, got %T", val, v)
+			return nil, fmt.Errorf("expected value for %s to be %T, got %T", k, val, v)
 		}
 		out[k] = val
 	}
@@ -117,6 +125,8 @@ func ParseProto(val *providerpb.Value) (any, error) {
 			}
 		}
 		return list, nil
+	case *providerpb.Value_Nil:
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("unhandled proto type: %T", v)
 	}
@@ -306,6 +316,10 @@ func ToValueProto(val any) (*providerpb.Value, error) {
 					Value: value,
 				},
 			},
+		}, nil
+	case nil:
+		return &providerpb.Value{
+			Type: &providerpb.Value_Nil{},
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid type: %T", val)
