@@ -21,7 +21,7 @@ func Parse{{ toPascalCase .Type.Name }}(v any) ({{ toPascalCase .Type.Name }}, e
   {{ end }}
 
   {{ range $k, $v := .Type.Fields -}}
-  {{ $k }}, err := {{ parseFieldFunc $v }}(m["{{ $k }}"])
+  {{ $k }}, err := {{ parseFieldFunc $k $v }}(m["{{ $k }}"])
   if err != nil {
     return {{ toPascalCase $.Type.Name }}{}, fmt.Errorf("error parsing {{ $.Type.Name }} for {{ $.ResourceName }}: %v", err)
   }
@@ -32,4 +32,23 @@ func Parse{{ toPascalCase .Type.Name }}(v any) ({{ toPascalCase .Type.Name }}, e
     {{ toPascalCase $k }}: {{ $k }},
   {{ end }}
   }, nil
+}
+
+func Parse{{ toPascalCase .Type.Name }}List(v any) ([]{{ toPascalCase .Type.Name }}, error) {
+	list, ok := v.([]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid type for list: %T", v)
+	}
+
+	var vals []{{ toPascalCase .Type.Name }}
+	for _, val := range list {
+		p, err := Parse{{ toPascalCase .Type.Name }}(val)
+		if err != nil {
+			return nil, err
+		}
+
+		vals = append(vals, p)
+	}
+
+	return vals, nil
 }

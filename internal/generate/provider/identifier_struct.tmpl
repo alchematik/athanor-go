@@ -28,7 +28,7 @@ func Parse{{ toPascalCase .Type.Name }}(v sdk.Identifier) ({{ toPascalCase .Type
   {{ end }}
 
   {{ range $k, $v := .Type.Fields -}}
-  {{ $k }}, err := {{ parseFieldFunc $v }}(m["{{ $k }}"])
+  {{ $k }}, err := {{ parseFieldFunc $k $v }}(m["{{ $k }}"])
   if err != nil {
     return {{ toPascalCase $.Type.Name }}{}, fmt.Errorf("error parsing {{ $.Type.Name }}: %v", err)
   }

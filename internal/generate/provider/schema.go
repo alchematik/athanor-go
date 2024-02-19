@@ -248,8 +248,8 @@ func generateStructType(resourceName string, t *providerpb.StructSchema) ([]byte
 	return buffer.Bytes(), nil
 }
 
-func parseFieldFunc(idPackage string) func(*providerpb.FieldSchema) (string, error) {
-	return func(f *providerpb.FieldSchema) (string, error) {
+func parseFieldFunc(idPackage string) func(string, *providerpb.FieldSchema) (string, error) {
+	return func(name string, f *providerpb.FieldSchema) (string, error) {
 		switch val := f.GetType().(type) {
 		case *providerpb.FieldSchema_StringSchema:
 			return "sdk.String", nil
@@ -267,6 +267,14 @@ func parseFieldFunc(idPackage string) func(*providerpb.FieldSchema) (string, err
 				return "", err
 			}
 
+			if t, ok := val.ListSchema.GetElement().GetType().(*providerpb.FieldSchema_StructSchema); ok {
+				return fmt.Sprintf("Parse%sList", util.PascalCase(t.StructSchema.GetName())), nil
+			}
+
+			if _, ok := val.ListSchema.GetElement().GetType().(*providerpb.FieldSchema_IdentifierSchema); ok {
+				return "identifier.ParseIdentifierList", nil
+			}
+
 			return fmt.Sprintf("sdk.List[%s]", subType), nil
 		case *providerpb.FieldSchema_FileSchema:
 			return "sdk.ParseFile", nil
@@ -275,7 +283,7 @@ func parseFieldFunc(idPackage string) func(*providerpb.FieldSchema) (string, err
 		case *providerpb.FieldSchema_BoolSchema:
 			return "sdk.Bool", nil
 		case *providerpb.FieldSchema_ImmutableSchema:
-			return parseFieldFunc(idPackage)(val.ImmutableSchema.GetValue())
+			return parseFieldFunc(idPackage)(name, val.ImmutableSchema.GetValue())
 		default:
 			return "", fmt.Errorf("unsupported type %T", f.GetType())
 		}

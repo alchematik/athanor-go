@@ -219,12 +219,24 @@ func ToType[T any](val any) any {
 	case []T:
 		l := make([]any, len(v))
 		for i := range v {
-			l[i] = v[i]
+			l[i] = convert(v[i])
 		}
 		return l
 	default:
 		return v
 	}
+}
+
+func convert(val any) any {
+	if v, ok := val.(ResourceType); ok {
+		return v.ToValue()
+	}
+
+	if v, ok := val.(ResourceIdentifier); ok {
+		return v.ToValue()
+	}
+
+	return val
 }
 
 func ToImmutableType(subTypeConvertFunc func(any) any) func(any) Immutable {
