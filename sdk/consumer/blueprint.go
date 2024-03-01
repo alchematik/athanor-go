@@ -20,6 +20,32 @@ func (b Blueprint) WithResource(r any) Blueprint {
 	return b
 }
 
+func (b Blueprint) WithBuild(alias string, repo Repo, translator Translator, config, runtimeConfig any) Blueprint {
+	b.stmts = append(b.stmts, buildStmt{
+		alias:         alias,
+		repo:          repo,
+		translator:    translator,
+		config:        config,
+		runtimeConfig: runtimeConfig,
+	})
+
+	return b
+}
+
+type buildStmt struct {
+	alias         string
+	repo          Repo
+	translator    Translator
+	config        any
+	runtimeConfig any
+}
+
+type Translator struct {
+	Repo    Repo
+	Name    string
+	Version string
+}
+
 type resourceStmt struct {
 	resource any
 }
@@ -118,6 +144,42 @@ func Build(bf BlueprintFunc) {
 					},
 				},
 			})
+		case buildStmt:
+			config, err := toExprProto(s.config)
+			if err != nil {
+				log.Fatalf("error converting build config: %v", err)
+			}
+
+			runtimeConfig, err := toExprProto(s.runtimeConfig)
+			if err != nil {
+				log.Fatalf("error converting runtime config: %v", err)
+			}
+
+			r, err := repoToProto(s.repo)
+			if err != nil {
+				log.Fatalf("error converting repo: %v", err)
+			}
+
+			tr, err := repoToProto(s.translator.Repo)
+			if err != nil {
+				log.Fatalf("error converting translator repo: %v", err)
+			}
+
+			p.Stmts = append(p.Stmts, &blueprintpb.Stmt{
+				Type: &blueprintpb.Stmt_Build{
+					Build: &blueprintpb.BuildStmt{
+						Alias: s.alias,
+						Repo:  r,
+						Translator: &blueprintpb.Translator{
+							Repo:    tr,
+							Name:    s.translator.Name,
+							Version: s.translator.Version,
+						},
+						Config:        config,
+						RuntimeConfig: runtimeConfig,
+					},
+				},
+			})
 		default:
 			log.Fatalf("invalid statement type: %T", stmt)
 		}
@@ -130,6 +192,21 @@ func Build(bf BlueprintFunc) {
 
 	if _, err := f.Write(data); err != nil {
 		log.Fatalf("error writing blueprint to file: %v", err)
+	}
+}
+
+func repoToProto(r Repo) (*blueprintpb.Repo, error) {
+	switch r := r.(type) {
+	case RepoLocal:
+		return &blueprintpb.Repo{
+			Type: &blueprintpb.Repo_Local{
+				Local: &blueprintpb.LocalRepo{
+					Path: r.Path,
+				},
+			},
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid repo type: %v", r)
 	}
 }
 
