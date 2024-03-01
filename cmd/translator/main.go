@@ -63,7 +63,11 @@ func (s *Server) TranslateProviderSchema(ctx context.Context, req *translatorpb.
 }
 
 func (s *Server) TranslateBlueprint(ctx context.Context, req *translatorpb.TranslateBlueprintRequest) (*translatorpb.TranslateBlueprintResponse, error) {
-	if err := exec.Command("go", "run", req.GetInputPath(), req.GetOutputPath()).Run(); err != nil {
+	inputPath := req.GetInputPath()
+	outputPath := req.GetOutputPath()
+	configPath := req.GetConfigPath()
+
+	if err := exec.Command("go", "run", inputPath, configPath, outputPath).Run(); err != nil {
 		return &translatorpb.TranslateBlueprintResponse{}, status.Error(codes.Internal, err.Error())
 	}
 

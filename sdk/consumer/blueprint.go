@@ -3,6 +3,7 @@ package sdk
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 
 	blueprintpb "github.com/alchematik/athanor-go/internal/gen/go/proto/blueprint/v1"
@@ -43,6 +44,17 @@ type Resource struct {
 type Provider struct {
 	Name    string
 	Version string
+	Repo    Repo
+}
+
+type Repo interface {
+	isRepo()
+}
+
+type RepoLocal struct {
+	Repo
+
+	Path string
 }
 
 type Get struct {
@@ -63,12 +75,31 @@ func GetResource(alias string) Get {
 	}
 }
 
-func Build(bp Blueprint) error {
-	outputPath := os.Args[1]
+type BlueprintFunc func(args any) (Blueprint, error)
+
+func Build(bf BlueprintFunc) {
+	configPath := os.Args[1]
+	configData, err := os.ReadFile(configPath)
+	if err != nil {
+		log.Fatalf("error opening config file: %v", err)
+	}
+
+	config := &blueprintpb.Expr{}
+	if err := json.Unmarshal(configData, config); err != nil {
+		log.Fatalf("error unmarshaling config: %v", err)
+	}
+
+	configExpr, err := fromProtoToExpr(config)
+	bp, err := bf(configExpr)
+	if err != nil {
+		log.Fatalf("error building blueprint: %v", err)
+	}
+
+	outputPath := os.Args[2]
 
 	f, err := os.OpenFile(outputPath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
-		return err
+		log.Fatalf("error opening output path: %v", err)
 	}
 
 	p := &blueprintpb.Blueprint{}
@@ -77,7 +108,7 @@ func Build(bp Blueprint) error {
 		case resourceStmt:
 			res, err := toExprProto(s.resource)
 			if err != nil {
-				return err
+				log.Fatalf("error converting statement into proto: %v", err)
 			}
 
 			p.Stmts = append(p.Stmts, &blueprintpb.Stmt{
@@ -88,18 +119,18 @@ func Build(bp Blueprint) error {
 				},
 			})
 		default:
-			return fmt.Errorf("invalid statement type: %T", stmt)
+			log.Fatalf("invalid statement type: %T", stmt)
 		}
 	}
 
 	data, err := json.Marshal(p)
 	if err != nil {
-		return err
+		log.Fatalf("error marshaling blueprint: %v", err)
 	}
 
-	_, err = f.Write(data)
-
-	return err
+	if _, err := f.Write(data); err != nil {
+		log.Fatalf("error writing blueprint to file: %v", err)
+	}
 }
 
 type exprConvertable interface {
@@ -207,11 +238,26 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 			},
 		}, nil
 	case Provider:
+		var repo *blueprintpb.Repo
+		switch r := e.Repo.(type) {
+		case RepoLocal:
+			repo = &blueprintpb.Repo{
+				Type: &blueprintpb.Repo_Local{
+					Local: &blueprintpb.LocalRepo{
+						Path: r.Path,
+					},
+				},
+			}
+		default:
+			return nil, fmt.Errorf("invalid repo type: %G", e.Repo)
+		}
+
 		return &blueprintpb.Expr{
 			Type: &blueprintpb.Expr_Provider{
 				Provider: &blueprintpb.ProviderExpr{
 					Name:    e.Name,
 					Version: e.Version,
+					Repo:    repo,
 				},
 			},
 		}, nil
@@ -236,5 +282,42 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported expression: %T", expr)
+	}
+}
+
+func fromProtoToExpr(p *blueprintpb.Expr) (any, error) {
+	switch t := p.GetType().(type) {
+	case *blueprintpb.Expr_StringLiteral:
+		return t.StringLiteral, nil
+	case *blueprintpb.Expr_BoolLiteral:
+		return t.BoolLiteral, nil
+	case *blueprintpb.Expr_List:
+		l := make([]any, len(t.List.GetElements()))
+		for i, e := range t.List.GetElements() {
+			converted, err := fromProtoToExpr(e)
+			if err != nil {
+				return nil, err
+			}
+
+			l[i] = converted
+		}
+
+		return l, nil
+	case *blueprintpb.Expr_Map:
+		m := map[string]any{}
+		for k, v := range t.Map.GetEntries() {
+			converted, err := toExprProto(v)
+			if err != nil {
+				return nil, err
+			}
+
+			m[k] = converted
+		}
+
+		return m, nil
+	case *blueprintpb.Expr_Nil:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("invalid expr type: %T", p)
 	}
 }
