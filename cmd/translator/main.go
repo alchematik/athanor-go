@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,7 +68,12 @@ func (s *Server) TranslateBlueprint(ctx context.Context, req *translatorpb.Trans
 	outputPath := req.GetOutputPath()
 	configPath := req.GetConfigPath()
 
-	if err := exec.Command("go", "run", inputPath, configPath, outputPath).Run(); err != nil {
+	cmd := exec.Command("go", "run", inputPath, configPath, outputPath)
+	logger := log.Default()
+	cmd.Stdout = logger.Writer()
+	cmd.Stderr = logger.Writer()
+
+	if err := cmd.Run(); err != nil {
 		return &translatorpb.TranslateBlueprintResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
