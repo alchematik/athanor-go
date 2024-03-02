@@ -116,6 +116,9 @@ func Build(bf BlueprintFunc) {
 	}
 
 	configExpr, err := fromProtoToExpr(config)
+	if err != nil {
+		log.Fatalf("error converting config: %v", err)
+	}
 	bp, err := bf(configExpr)
 	if err != nil {
 		log.Fatalf("error building blueprint: %v", err)
@@ -383,7 +386,7 @@ func fromProtoToExpr(p *blueprintpb.Expr) (any, error) {
 	case *blueprintpb.Expr_Map:
 		m := map[string]any{}
 		for k, v := range t.Map.GetEntries() {
-			converted, err := toExprProto(v)
+			converted, err := fromProtoToExpr(v)
 			if err != nil {
 				return nil, err
 			}
