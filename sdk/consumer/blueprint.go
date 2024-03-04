@@ -20,12 +20,12 @@ func (b Blueprint) WithResource(r any) Blueprint {
 	return b
 }
 
-func (b Blueprint) WithBuild(alias string, repo Repo, translator Translator, config, runtimeConfig any) Blueprint {
+func (b Blueprint) WithBuild(alias string, repo Repo, translator Translator, runtimeConfig any, config ...any) Blueprint {
 	b.stmts = append(b.stmts, buildStmt{
 		alias:         alias,
 		repo:          repo,
 		translator:    translator,
-		config:        config,
+		configs:       config,
 		runtimeConfig: runtimeConfig,
 	})
 
@@ -36,7 +36,7 @@ type buildStmt struct {
 	alias         string
 	repo          Repo
 	translator    Translator
-	config        any
+	configs       []any
 	runtimeConfig any
 }
 
@@ -101,7 +101,9 @@ func GetResource(alias string) Get {
 	}
 }
 
-type BlueprintFunc func(args any) (Blueprint, error)
+type RuntimeConfig struct{}
+
+type BlueprintFunc func(args ...any) (Blueprint, error)
 
 func Build(bf BlueprintFunc) {
 	configPath := os.Args[1]
@@ -110,16 +112,22 @@ func Build(bf BlueprintFunc) {
 		log.Fatalf("error opening config file: %v", err)
 	}
 
-	config := &blueprintpb.Expr{}
-	if err := json.Unmarshal(configData, config); err != nil {
+	configs := []*blueprintpb.Expr{}
+	if err := json.Unmarshal(configData, &configs); err != nil {
 		log.Fatalf("error unmarshaling config: %v", err)
 	}
 
-	configExpr, err := fromProtoToExpr(config)
-	if err != nil {
-		log.Fatalf("error converting config: %v", err)
+	configExprs := make([]any, len(configs))
+	for i, c := range configs {
+		config, err := fromProtoToExpr(c)
+		if err != nil {
+			log.Fatalf("error converting config: %v", err)
+		}
+
+		configExprs[i] = config
 	}
-	bp, err := bf(configExpr)
+
+	bp, err := bf(configExprs...)
 	if err != nil {
 		log.Fatalf("error building blueprint: %v", err)
 	}
@@ -148,9 +156,14 @@ func Build(bf BlueprintFunc) {
 				},
 			})
 		case buildStmt:
-			config, err := toExprProto(s.config)
-			if err != nil {
-				log.Fatalf("error converting build config: %v", err)
+			configs := make([]*blueprintpb.Expr, len(s.configs))
+			for i, c := range s.configs {
+				config, err := toExprProto(c)
+				if err != nil {
+					log.Fatalf("error converting build config: %v", err)
+				}
+
+				configs[i] = config
 			}
 
 			runtimeConfig, err := toExprProto(s.runtimeConfig)
@@ -178,7 +191,7 @@ func Build(bf BlueprintFunc) {
 							Name:    s.translator.Name,
 							Version: s.translator.Version,
 						},
-						Config:        config,
+						Config:        configs,
 						RuntimeConfig: runtimeConfig,
 					},
 				},
@@ -352,6 +365,12 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 					Name:   e.Name,
 					Object: obj,
 				},
+			},
+		}, nil
+	case RuntimeConfig:
+		return &blueprintpb.Expr{
+			Type: &blueprintpb.Expr_GetRuntimeConfig{
+				GetRuntimeConfig: &blueprintpb.GetRuntimeConfig{},
 			},
 		}, nil
 	case exprConvertable:
