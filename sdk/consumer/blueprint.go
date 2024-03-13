@@ -20,7 +20,7 @@ func (b Blueprint) WithResource(r any) Blueprint {
 	return b
 }
 
-func (b Blueprint) WithBuild(alias string, repo Repo, translator Translator, runtimeConfig any, config ...any) Blueprint {
+func (b Blueprint) WithBuild(alias string, repo Source, translator Translator, runtimeConfig any, config ...any) Blueprint {
 	b.stmts = append(b.stmts, buildStmt{
 		alias:         alias,
 		repo:          repo,
@@ -34,16 +34,15 @@ func (b Blueprint) WithBuild(alias string, repo Repo, translator Translator, run
 
 type buildStmt struct {
 	alias         string
-	repo          Repo
+	repo          Source
 	translator    Translator
 	configs       []any
 	runtimeConfig any
 }
 
 type Translator struct {
-	Repo    Repo
-	Name    string
-	Version string
+	Source Source
+	Name   string
 }
 
 type resourceStmt struct {
@@ -68,19 +67,28 @@ type Resource struct {
 }
 
 type Provider struct {
-	Name    string
-	Version string
-	Repo    Repo
+	Name   string
+	Source Source
 }
 
-type Repo interface {
+type Source interface {
 	isRepo()
 }
 
-type RepoLocal struct {
-	Repo
+type SourceFilePath struct {
+	Source
 
 	Path string
+}
+
+type SourceGitHubRelease struct {
+	Source
+
+	RepoOwner    string
+	RepoName     string
+	ReleaseName  string
+	ArtifactName string
+	ChecksumName string
 }
 
 type Get struct {
@@ -171,12 +179,12 @@ func Build(bf BlueprintFunc) {
 				log.Fatalf("error converting runtime config: %v", err)
 			}
 
-			r, err := repoToProto(s.repo)
+			r, err := sourceToProto(s.repo)
 			if err != nil {
 				log.Fatalf("error converting repo: %v", err)
 			}
 
-			tr, err := repoToProto(s.translator.Repo)
+			tr, err := sourceToProto(s.translator.Source)
 			if err != nil {
 				log.Fatalf("error converting translator repo: %v", err)
 			}
@@ -184,15 +192,16 @@ func Build(bf BlueprintFunc) {
 			p.Stmts = append(p.Stmts, &blueprintpb.Stmt{
 				Type: &blueprintpb.Stmt_Build{
 					Build: &blueprintpb.BuildStmt{
-						Alias: s.alias,
-						Repo:  r,
 						Translator: &blueprintpb.Translator{
-							Repo:    tr,
-							Name:    s.translator.Name,
-							Version: s.translator.Version,
+							Source: tr,
+							Name:   s.translator.Name,
 						},
-						Config:        configs,
-						RuntimeConfig: runtimeConfig,
+						Build: &blueprintpb.BuildExpr{
+							Alias:         s.alias,
+							Source:        r,
+							Config:        configs,
+							RuntimeConfig: runtimeConfig,
+						},
 					},
 				},
 			})
@@ -211,18 +220,30 @@ func Build(bf BlueprintFunc) {
 	}
 }
 
-func repoToProto(r Repo) (*blueprintpb.Repo, error) {
-	switch r := r.(type) {
-	case RepoLocal:
-		return &blueprintpb.Repo{
-			Type: &blueprintpb.Repo_Local{
-				Local: &blueprintpb.LocalRepo{
-					Path: r.Path,
+func sourceToProto(s Source) (*blueprintpb.Source, error) {
+	switch s := s.(type) {
+	case SourceFilePath:
+		return &blueprintpb.Source{
+			Type: &blueprintpb.Source_FilePath{
+				FilePath: &blueprintpb.FilePathSource{
+					Path: s.Path,
+				},
+			},
+		}, nil
+	case SourceGitHubRelease:
+		return &blueprintpb.Source{
+			Type: &blueprintpb.Source_GitHubRelease{
+				GitHubRelease: &blueprintpb.GitHubReleaseSource{
+					RepoOwner:    s.RepoOwner,
+					RepoName:     s.RepoName,
+					ReleaseName:  s.ReleaseName,
+					ArtifactName: s.ArtifactName,
+					ChecksumName: s.ChecksumName,
 				},
 			},
 		}, nil
 	default:
-		return nil, fmt.Errorf("invalid repo type: %v", r)
+		return nil, fmt.Errorf("invalid repo type: %v", s)
 	}
 }
 
@@ -331,26 +352,16 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 			},
 		}, nil
 	case Provider:
-		var repo *blueprintpb.Repo
-		switch r := e.Repo.(type) {
-		case RepoLocal:
-			repo = &blueprintpb.Repo{
-				Type: &blueprintpb.Repo_Local{
-					Local: &blueprintpb.LocalRepo{
-						Path: r.Path,
-					},
-				},
-			}
-		default:
-			return nil, fmt.Errorf("invalid repo type: %G", e.Repo)
+		src, err := sourceToProto(e.Source)
+		if err != nil {
+			return nil, err
 		}
 
 		return &blueprintpb.Expr{
 			Type: &blueprintpb.Expr_Provider{
 				Provider: &blueprintpb.ProviderExpr{
-					Name:    e.Name,
-					Version: e.Version,
-					Repo:    repo,
+					Name:   e.Name,
+					Source: src,
 				},
 			},
 		}, nil
