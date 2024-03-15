@@ -84,11 +84,9 @@ type SourceFilePath struct {
 type SourceGitHubRelease struct {
 	Source
 
-	RepoOwner    string
-	RepoName     string
-	ReleaseName  string
-	ArtifactName string
-	ChecksumName string
+	RepoOwner string
+	RepoName  string
+	Name      string
 }
 
 type Get struct {
@@ -115,6 +113,8 @@ type BlueprintFunc func(args ...any) (Blueprint, error)
 
 func Build(bf BlueprintFunc) {
 	configPath := os.Args[1]
+
+	fmt.Printf("BUILDING BLUEPRINT >>>> %v\n", configPath)
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		log.Fatalf("error opening config file: %v", err)
@@ -234,11 +234,9 @@ func sourceToProto(s Source) (*blueprintpb.Source, error) {
 		return &blueprintpb.Source{
 			Type: &blueprintpb.Source_GitHubRelease{
 				GitHubRelease: &blueprintpb.GitHubReleaseSource{
-					RepoOwner:    s.RepoOwner,
-					RepoName:     s.RepoName,
-					ReleaseName:  s.ReleaseName,
-					ArtifactName: s.ArtifactName,
-					ChecksumName: s.ChecksumName,
+					RepoOwner: s.RepoOwner,
+					RepoName:  s.RepoName,
+					Name:      s.Name,
 				},
 			},
 		}, nil
