@@ -13,9 +13,11 @@ type Blueprint struct {
 	stmts []any
 }
 
-func (b Blueprint) WithResource(r any) Blueprint {
+func (b Blueprint) WithResource(exists any, provider Provider, resource Resource) Blueprint {
 	b.stmts = append(b.stmts, resourceStmt{
-		resource: r,
+		exists:   exists,
+		provider: provider,
+		resource: resource,
 	})
 	return b
 }
@@ -46,7 +48,9 @@ type Translator struct {
 }
 
 type resourceStmt struct {
-	resource any
+	exists   any
+	resource Resource
+	provider Provider
 }
 
 type File struct {
@@ -60,8 +64,6 @@ type ResourceIdentifier struct {
 }
 
 type Resource struct {
-	Exists     any
-	Provider   any
 	Identifier any
 	Config     any
 }
@@ -151,7 +153,17 @@ func Build(bf BlueprintFunc) {
 	for _, stmt := range bp.stmts {
 		switch s := stmt.(type) {
 		case resourceStmt:
-			res, err := toExprProto(s.resource)
+			res, err := toResourceExprProto(s.resource)
+			if err != nil {
+				log.Fatalf("error converting statement into proto: %v", err)
+			}
+
+			exists, err := toExprProto(s.exists)
+			if err != nil {
+				log.Fatalf("error converting statement into proto: %v", err)
+			}
+
+			provider, err := toProviderExprProto(s.provider)
 			if err != nil {
 				log.Fatalf("error converting statement into proto: %v", err)
 			}
@@ -159,7 +171,9 @@ func Build(bf BlueprintFunc) {
 			p.Stmts = append(p.Stmts, &blueprintpb.Stmt{
 				Type: &blueprintpb.Stmt_Resource{
 					Resource: &blueprintpb.ResourceStmt{
-						Expr: res,
+						Exists:   exists,
+						Resource: res,
+						Provider: provider,
 					},
 				},
 			})
@@ -319,48 +333,25 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 			},
 		}, nil
 	case Resource:
-		provider, err := toExprProto(e.Provider)
-		if err != nil {
-			return nil, err
-		}
-
-		id, err := toExprProto(e.Identifier)
-		if err != nil {
-			return nil, err
-		}
-
-		config, err := toExprProto(e.Config)
-		if err != nil {
-			return nil, err
-		}
-
-		exists, err := toExprProto(e.Exists)
+		res, err := toResourceExprProto(e)
 		if err != nil {
 			return nil, err
 		}
 
 		return &blueprintpb.Expr{
 			Type: &blueprintpb.Expr_Resource{
-				Resource: &blueprintpb.ResourceExpr{
-					Provider:   provider,
-					Identifier: id,
-					Config:     config,
-					Exists:     exists,
-				},
+				Resource: res,
 			},
 		}, nil
 	case Provider:
-		src, err := sourceToProto(e.Source)
+		p, err := toProviderExprProto(e)
 		if err != nil {
 			return nil, err
 		}
 
 		return &blueprintpb.Expr{
 			Type: &blueprintpb.Expr_Provider{
-				Provider: &blueprintpb.ProviderExpr{
-					Name:   e.Name,
-					Source: src,
-				},
+				Provider: p,
 			},
 		}, nil
 	case Get:
@@ -391,6 +382,35 @@ func toExprProto(expr any) (*blueprintpb.Expr, error) {
 	default:
 		return nil, fmt.Errorf("unsupported expression: %T", expr)
 	}
+}
+
+func toResourceExprProto(res Resource) (*blueprintpb.ResourceExpr, error) {
+	id, err := toExprProto(res.Identifier)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := toExprProto(res.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &blueprintpb.ResourceExpr{
+		Identifier: id,
+		Config:     config,
+	}, nil
+}
+
+func toProviderExprProto(p Provider) (*blueprintpb.ProviderExpr, error) {
+	s, err := sourceToProto(p.Source)
+	if err != nil {
+		return nil, err
+	}
+
+	return &blueprintpb.ProviderExpr{
+		Name:   p.Name,
+		Source: s,
+	}, nil
 }
 
 func fromProtoToExpr(p *blueprintpb.Expr) (any, error) {
