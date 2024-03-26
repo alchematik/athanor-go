@@ -22,7 +22,7 @@ func (b Blueprint) WithResource(exists any, provider Provider, resource Resource
 	return b
 }
 
-func (b Blueprint) WithBuild(alias string, repo Source, translator Translator, runtimeConfig any, config ...any) Blueprint {
+func (b Blueprint) WithBuild(alias string, repo BlueprintSource, translator Translator, runtimeConfig any, config ...any) Blueprint {
 	b.stmts = append(b.stmts, buildStmt{
 		alias:         alias,
 		repo:          repo,
@@ -36,14 +36,14 @@ func (b Blueprint) WithBuild(alias string, repo Source, translator Translator, r
 
 type buildStmt struct {
 	alias         string
-	repo          Source
+	repo          BlueprintSource
 	translator    Translator
 	configs       []any
 	runtimeConfig any
 }
 
 type Translator struct {
-	Source Source
+	Source PluginSource
 	Name   string
 }
 
@@ -69,26 +69,35 @@ type Resource struct {
 }
 
 type Provider struct {
-	Name   string
-	Source Source
+	Source PluginSource
 }
 
-type Source interface {
-	isRepo()
+type PluginSource interface {
+	isPluginSource()
 }
 
-type SourceFilePath struct {
-	Source
+type PluginSourceFilePath struct {
+	PluginSource
 
 	Path string
 }
 
-type SourceGitHubRelease struct {
-	Source
+type PluginSourceGitHubRelease struct {
+	PluginSource
 
 	RepoOwner string
 	RepoName  string
 	Name      string
+}
+
+type BlueprintSource interface {
+	isBlueprintSource()
+}
+
+type BlueprintSourceFilePath struct {
+	BlueprintSource
+
+	Path string
 }
 
 type Get struct {
@@ -114,9 +123,9 @@ type RuntimeConfig struct{}
 type BlueprintFunc func(args ...any) (Blueprint, error)
 
 func Build(bf BlueprintFunc) {
-	configPath := os.Args[1]
+	configPath := os.Args[0]
+	log.Printf("ARGS >>> %v\n", os.Args)
 
-	fmt.Printf("BUILDING BLUEPRINT >>>> %v\n", configPath)
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		log.Fatalf("error opening config file: %v", err)
@@ -142,7 +151,7 @@ func Build(bf BlueprintFunc) {
 		log.Fatalf("error building blueprint: %v", err)
 	}
 
-	outputPath := os.Args[2]
+	outputPath := os.Args[1]
 
 	f, err := os.OpenFile(outputPath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
@@ -193,12 +202,12 @@ func Build(bf BlueprintFunc) {
 				log.Fatalf("error converting runtime config: %v", err)
 			}
 
-			r, err := sourceToProto(s.repo)
+			r, err := blueprintSourceToProto(s.repo)
 			if err != nil {
 				log.Fatalf("error converting repo: %v", err)
 			}
 
-			tr, err := sourceToProto(s.translator.Source)
+			tr, err := pluginSourceToProto(s.translator.Source)
 			if err != nil {
 				log.Fatalf("error converting translator repo: %v", err)
 			}
@@ -234,20 +243,35 @@ func Build(bf BlueprintFunc) {
 	}
 }
 
-func sourceToProto(s Source) (*blueprintpb.Source, error) {
+func blueprintSourceToProto(s BlueprintSource) (*blueprintpb.BlueprintSource, error) {
 	switch s := s.(type) {
-	case SourceFilePath:
-		return &blueprintpb.Source{
-			Type: &blueprintpb.Source_FilePath{
-				FilePath: &blueprintpb.FilePathSource{
+	case BlueprintSourceFilePath:
+		return &blueprintpb.BlueprintSource{
+			Type: &blueprintpb.BlueprintSource_FilePath{
+				FilePath: &blueprintpb.BlueprintSourceFilePath{
 					Path: s.Path,
 				},
 			},
 		}, nil
-	case SourceGitHubRelease:
-		return &blueprintpb.Source{
-			Type: &blueprintpb.Source_GitHubRelease{
-				GitHubRelease: &blueprintpb.GitHubReleaseSource{
+	default:
+		return nil, fmt.Errorf("invalid blueprint source: %T", s)
+	}
+}
+
+func pluginSourceToProto(s PluginSource) (*blueprintpb.PluginSource, error) {
+	switch s := s.(type) {
+	case PluginSourceFilePath:
+		return &blueprintpb.PluginSource{
+			Type: &blueprintpb.PluginSource_FilePath{
+				FilePath: &blueprintpb.PluginSourceFilePath{
+					Path: s.Path,
+				},
+			},
+		}, nil
+	case PluginSourceGitHubRelease:
+		return &blueprintpb.PluginSource{
+			Type: &blueprintpb.PluginSource_GitHubRelease{
+				GitHubRelease: &blueprintpb.PluginSourceGitHubRelease{
 					RepoOwner: s.RepoOwner,
 					RepoName:  s.RepoName,
 					Name:      s.Name,
@@ -402,13 +426,12 @@ func toResourceExprProto(res Resource) (*blueprintpb.ResourceExpr, error) {
 }
 
 func toProviderExprProto(p Provider) (*blueprintpb.ProviderExpr, error) {
-	s, err := sourceToProto(p.Source)
+	s, err := pluginSourceToProto(p.Source)
 	if err != nil {
 		return nil, err
 	}
 
 	return &blueprintpb.ProviderExpr{
-		Name:   p.Name,
 		Source: s,
 	}, nil
 }

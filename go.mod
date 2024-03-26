@@ -3,6 +3,7 @@ module github.com/alchematik/athanor-go
 go 1.20
 
 require (
+	github.com/bytecodealliance/wasmtime-go/v19 v19.0.0
 	github.com/hashicorp/go-plugin v1.6.0
 	golang.org/x/text v0.13.0
 	google.golang.org/grpc v1.60.1
